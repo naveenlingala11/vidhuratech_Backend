@@ -7,6 +7,7 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Component
 public class ScraperConfigLoader {
@@ -17,7 +18,6 @@ public class ScraperConfigLoader {
         this.repo = repo;
     }
 
-    @PostConstruct
     public void load() {
 
         // 🔥 already exists → skip
@@ -32,13 +32,17 @@ public class ScraperConfigLoader {
 
         int added = 0;
 
+        // ✅ FETCH ONCE (IMPORTANT)
+        Set<String> existingCompanies = repo.findAll()
+                .stream()
+                .map(e -> e.getCompany().toLowerCase())
+                .collect(Collectors.toSet());
+
         for (ApiConfig c : configs) {
             try {
 
-                boolean exists = repo.findAll().stream()
-                        .anyMatch(e -> e.getCompany().equalsIgnoreCase(c.getCompany()));
-
-                if (exists) continue;
+                // ✅ CHECK USING SET (FAST)
+                if (existingCompanies.contains(c.getCompany().toLowerCase())) continue;
 
                 ScraperConfigEntity e = new ScraperConfigEntity();
                 e.setCompany(c.getCompany());
