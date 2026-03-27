@@ -1,17 +1,9 @@
-FROM openjdk:17-jdk-slim
-
-LABEL maintainer="Naveen"
+FROM eclipse-temurin:17-jdk-jammy
 
 WORKDIR /app
 
-# Copy jar
 COPY target/*.jar app.jar
-
-# Run as non-root (security best practice)
-RUN useradd -m appuser
-USER appuser
 
 EXPOSE 8080
 
-# JVM optimization (important for cloud)
-ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
