@@ -85,6 +85,11 @@
 			<optional>true</optional>
 		</dependency>
 
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-core</artifactId>
+		</dependency>
+
 		<!-- ── Test ──────────────────────────────────────────────────────── -->
 		<!-- ✅ FIXED: was spring-boot-starter-data-jpa-test (invalid) -->
 		<dependency>
