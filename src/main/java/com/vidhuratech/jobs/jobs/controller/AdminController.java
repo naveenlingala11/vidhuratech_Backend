@@ -90,9 +90,9 @@ public class AdminController {
         Map<String, Object> map = new HashMap<>();
 
         map.put("totalJobs", jobRepo.count());
-        map.put("today", jobRepo.countByPostedAtAfter(LocalDateTime.now().minusDays(1)));
-        map.put("week", jobRepo.countByPostedAtAfter(LocalDateTime.now().minusDays(7)));
-        map.put("month", jobRepo.countByPostedAtAfter(LocalDateTime.now().minusDays(30)));
+        map.put("today", jobRepo.countRecent(LocalDateTime.now().minusDays(1)));
+        map.put("week", jobRepo.countRecent(LocalDateTime.now().minusDays(7)));
+        map.put("month", jobRepo.countRecent(LocalDateTime.now().minusDays(30)));
 
         return map;
     }

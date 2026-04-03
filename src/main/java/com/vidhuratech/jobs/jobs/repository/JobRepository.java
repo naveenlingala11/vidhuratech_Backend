@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -38,5 +39,10 @@ public interface JobRepository extends JpaRepository<Job, Long>, JpaSpecificatio
 
     boolean existsByTitleAndCompanyAndApplyLink(String title, Company company, String applyLink);
 
-    long countByPostedAtAfter(LocalDateTime date);
-}
+    @Query("""
+    SELECT COUNT(j)
+    FROM Job j
+    WHERE j.postedAt IS NOT NULL
+    AND j.postedAt >= :date
+    """)
+    long countRecent(@Param("date") LocalDateTime date);}

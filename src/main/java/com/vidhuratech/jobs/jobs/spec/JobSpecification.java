@@ -64,7 +64,7 @@ public class JobSpecification {
 
             // skills (join → exact name IN list)
             if (skills != null && !skills.isEmpty()) {
-                Join<Object, Object> sJoin = root.join("skills", JoinType.LEFT);
+                Join<Object, Object> sJoin = root.join("skills", JoinType.INNER);
 
                 Predicate skillPred = cb.disjunction();
 
@@ -72,7 +72,7 @@ public class JobSpecification {
                     String like = "%" + s.toLowerCase() + "%";
 
                     skillPred = cb.or(skillPred,
-                            cb.like(cb.lower(sJoin.get("name")), like),
+                            cb.equal(cb.lower(sJoin.get("name")), s.toLowerCase()),
                             cb.like(cb.lower(root.get("description")), like) // 🔥 NEW
                     );
                 }

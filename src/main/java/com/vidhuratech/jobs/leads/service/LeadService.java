@@ -35,9 +35,13 @@ public class LeadService {
         return repo.findAll(Sort.by(Sort.Direction.DESC, "createdAt"));
     }
 
-    public Page<Lead> getLeads(String search, int page, int size) {
+    public Page<Lead> getLeads(String search, int page, int size, String sortBy, String direction) {
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Sort sort = direction.equalsIgnoreCase("asc")
+                ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+
+        Pageable pageable = PageRequest.of(page, size, sort);
 
         if (search == null || search.isEmpty()) {
             return repo.findByDeletedFalse(pageable);

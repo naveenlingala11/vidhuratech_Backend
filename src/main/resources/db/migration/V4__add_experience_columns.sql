@@ -1,0 +1,2 @@
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS min_experience INT;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS max_experience INT;

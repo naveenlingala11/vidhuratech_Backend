@@ -60,6 +60,8 @@ public class Job {
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
+    private Integer minExperience;
+    private Integer maxExperience;
 
     @PrePersist
     public void prePersist() {

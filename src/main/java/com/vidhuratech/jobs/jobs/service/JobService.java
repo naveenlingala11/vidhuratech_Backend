@@ -83,6 +83,10 @@ public class JobService {
                 }
             }
 
+            if (job.getPostedAt() == null) {
+                job.setPostedAt(LocalDateTime.now());
+            }
+
             saved.setSkills(skills);
             jobRepo.save(saved);
 
