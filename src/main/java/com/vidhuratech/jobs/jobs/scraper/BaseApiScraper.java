@@ -54,7 +54,11 @@ public abstract class BaseApiScraper {
         job.setTitle(title);
         job.setRole(title); // 🔥 useful for filtering
         job.setCompanyName(company);
-        job.setLocation(location == null ? "India" : location);
+        job.setLocation(
+                (location == null || location.isBlank())
+                        ? "Not Specified"
+                        : location
+        );
         job.setExperience(exp == null ? "0-15+ years" : exp);
         job.setApplyLink(link);
 

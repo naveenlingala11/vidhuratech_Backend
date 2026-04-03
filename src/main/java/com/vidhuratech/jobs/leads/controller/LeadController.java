@@ -49,9 +49,11 @@ public class LeadController {
     public Page<Lead> getLeads(
             @RequestParam(defaultValue = "") String search,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction) {
 
-        return service.getLeads(search, page, size);
+        return service.getLeads(search, page, size, sortBy, direction);
     }
 
     @GetMapping("/analytics")

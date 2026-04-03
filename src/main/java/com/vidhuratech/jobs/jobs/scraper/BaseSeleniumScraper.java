@@ -88,6 +88,8 @@ public abstract class BaseSeleniumScraper {
         job.setApplyLink(link);
         job.setSource(company);
         job.setPostedAt(LocalDateTime.now());
+        job.setMinExperience(0);
+        job.setMaxExperience(3);
         return job;
     }
 
