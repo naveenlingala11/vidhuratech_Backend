@@ -27,4 +27,5 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
 
     List<Lead> findByDeletedTrueAndDeletedAtBefore(LocalDateTime time);
 
+    List<Lead> findTop5ByPhoneContainingAndDeletedFalseOrderByCreatedAtDesc(String phone);
 }
