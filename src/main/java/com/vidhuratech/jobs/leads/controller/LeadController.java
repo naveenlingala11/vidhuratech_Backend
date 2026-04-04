@@ -103,4 +103,19 @@ public class LeadController {
 
         service.updateFollowUp(phone, date);
     }
+
+    @GetMapping("/by-phone")
+    public Lead getByPhone(@RequestParam String phone) {
+        return repository.findByPhone(phone).orElse(null);
+    }
+
+    @GetMapping("/search")
+    public List<Lead> search(@RequestParam String phone) {
+
+        if (phone == null || phone.length() < 3) {
+            return List.of(); // avoid heavy queries
+        }
+
+        return service.searchByPhone(phone);
+    }
 }

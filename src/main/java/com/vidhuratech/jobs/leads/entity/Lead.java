@@ -16,6 +16,7 @@ public class Lead {
     private Long id;
 
     private String name;
+    @Column(name = "phone", length = 15)
     private String phone;
     private String email;
     private String course;

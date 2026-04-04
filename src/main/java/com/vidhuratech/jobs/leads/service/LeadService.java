@@ -99,4 +99,8 @@ public class LeadService {
         repo.save(lead);
     }
 
+    public List<Lead> searchByPhone(String phone) {
+        return repo.findTop5ByPhoneContainingAndDeletedFalseOrderByCreatedAtDesc(phone);
+    }
+
 }
