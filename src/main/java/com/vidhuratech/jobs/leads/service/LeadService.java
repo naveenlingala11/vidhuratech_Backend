@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -21,9 +22,33 @@ public class LeadService {
     private final LeadRepository repo;
 
     public void saveLead(Lead lead) {
+
+        // 🔥 24 hrs check
+        LocalDateTime last24hrs = LocalDateTime.now().minusHours(24);
+
+        boolean exists = repo.existsRecentLead(
+                lead.getPhone(),
+                last24hrs
+        );
+
+        Optional<Lead> existing = repo.findByPhone(lead.getPhone());
+
+        if (existing.isPresent()) {
+            Lead old = existing.get();
+
+            old.setName(lead.getName());
+            old.setEmail(lead.getEmail());
+            old.setCourse(lead.getCourse());
+            old.setCity(lead.getCity());
+            old.setMessage(lead.getMessage());
+            old.setCreatedAt(LocalDateTime.now()); // refresh time
+
+            repo.save(old);
+            return;
+        }
+
         repo.save(lead);
     }
-
     public void updateStatus(String phone, String status) {
         Lead lead = repo.findByPhone(phone).orElseThrow();
 

@@ -6,6 +6,7 @@ import com.vidhuratech.jobs.leads.service.LeadAccessService;
 import com.vidhuratech.jobs.leads.service.LeadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,8 +24,13 @@ public class LeadController {
 
     // ✅ SAVE FORM
     @PostMapping("/save")
-    public void save(@RequestBody Lead lead) {
-        service.saveLead(lead);
+    public ResponseEntity<?> saveLead(@RequestBody Lead lead) {
+        try {
+            service.saveLead(lead);
+            return ResponseEntity.ok("Saved");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     // 🔥 ADMIN UPDATE STATUS

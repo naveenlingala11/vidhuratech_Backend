@@ -18,6 +18,8 @@ public class Certificate {
     private String name;
     private String course;
     private String email;
+    private String mobile;
+    private String remarks;
 
     private LocalDateTime issuedAt;
 }

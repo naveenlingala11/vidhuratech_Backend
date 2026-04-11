@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 public class CertificateService {
@@ -17,7 +18,12 @@ public class CertificateService {
     }
 
     public Certificate save(Certificate c) {
+
+        // 🔥 GENERATE UNIQUE ID
+        c.setId("VT-" + UUID.randomUUID().toString().substring(0, 8));
+
         c.setIssuedAt(LocalDateTime.now());
+
         return repo.save(c);
     }
 
