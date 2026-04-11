@@ -6,6 +6,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
+@Table(name = "invoice")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -44,4 +45,11 @@ public class Invoice {
     private String notes;
 
     private LocalDateTime createdAt;
+
+    @PrePersist
+    public void prePersist() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+    }
 }
