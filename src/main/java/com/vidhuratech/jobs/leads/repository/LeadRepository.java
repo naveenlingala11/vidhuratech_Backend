@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,4 +33,7 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
 
     @Query("SELECT COUNT(l) > 0 FROM Lead l WHERE l.phone = :phone AND l.createdAt >= :time AND l.deleted = false")
     boolean existsRecentLead(String phone, LocalDateTime time);
+
+    // FIXED
+    List<Lead> findAllByPhoneOrderByCreatedAtDesc(String phone);
 }
