@@ -1,0 +1,14 @@
+ALTER TABLE invoice
+    ADD COLUMN IF NOT EXISTS payment_verified BOOLEAN DEFAULT FALSE;
+
+ALTER TABLE invoice
+    ADD COLUMN IF NOT EXISTS payment_screenshot_url VARCHAR(1000);
+
+ALTER TABLE invoice
+    ADD COLUMN IF NOT EXISTS utr_number VARCHAR(255);
+
+ALTER TABLE invoice
+    ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP;
+
+ALTER TABLE invoice
+    ADD COLUMN IF NOT EXISTS verified_by VARCHAR(255);
