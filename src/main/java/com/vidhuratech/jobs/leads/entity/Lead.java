@@ -39,4 +39,8 @@ public class Lead {
             this.createdAt = LocalDateTime.now();
         }
     }
+
+    private String source;
+    // DEMO / PURCHASE / ADMIN / WHATSAPP
+    private Double expectedAmount;
 }

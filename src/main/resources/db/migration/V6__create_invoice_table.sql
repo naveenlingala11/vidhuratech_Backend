@@ -1,6 +1,6 @@
 -- VXX__create_invoice_table.sql
 
-CREATE TABLE invoice (
+CREATE TABLE IF NOT EXISTS invoice (
                          id VARCHAR(255) PRIMARY KEY,
 
                          lead_phone VARCHAR(50),

@@ -52,4 +52,14 @@ public class Invoice {
             createdAt = LocalDateTime.now();
         }
     }
+
+    private String utrNumber;
+
+    private String paymentScreenshotUrl;
+
+    private Boolean paymentVerified = false;
+
+    private LocalDateTime verifiedAt;
+
+    private String verifiedBy;
 }
