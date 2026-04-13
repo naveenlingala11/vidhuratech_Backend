@@ -195,7 +195,7 @@ public class CheckoutService {
         Lead savedLead = leadRepo.save(lead);
 
         // TEMP TEST OVERRIDE
-        Double payableAmount = 1.0; // <-- Testing QR scan purpose
+        // Double payableAmount = 1.0; // <-- Testing QR scan purpose
         // Double payableAmount = request.getAmount(); // PROD revert
 
         Invoice invoice = Invoice.builder()
@@ -206,9 +206,11 @@ public class CheckoutService {
                 .mobile(savedLead.getPhone())
                 .course(savedLead.getCourse())
                 .batch(savedLead.getBatch())
-                .amount(payableAmount)
+                .amount(request.getAmount())
+//              .amount(payableAmount)
                 .paidAmount(0.0)
-                .remainingAmount(payableAmount)
+                .remainingAmount(request.getAmount())
+//              .remainingAmount(payableAmount)
                 .paymentStatus("PENDING")
                 .paymentMethod(request.getPaymentMethod())
                 .createdAt(LocalDateTime.now())
@@ -220,7 +222,8 @@ public class CheckoutService {
                 "upi://pay" +
                         "?pa=" + URLEncoder.encode(paymentConfig.getUpiId(), StandardCharsets.UTF_8) +
                         "&pn=" + URLEncoder.encode(paymentConfig.getMerchantName(), StandardCharsets.UTF_8) +
-                        "&am=" + String.format("%.2f", payableAmount) +
+//                      "&am=" + String.format("%.2f", payableAmount) +
+                        "&am=" + String.format("%.2f", request.getAmount()) +
                         "&cu=INR" +
                         "&tn=" + URLEncoder.encode("Course Payment", StandardCharsets.UTF_8) +
                         "&tr=" + URLEncoder.encode(invoice.getId(), StandardCharsets.UTF_8);
