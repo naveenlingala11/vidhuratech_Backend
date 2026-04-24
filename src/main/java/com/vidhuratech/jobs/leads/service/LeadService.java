@@ -23,13 +23,17 @@ public class LeadService {
 
     public void saveLead(Lead lead) {
 
-        // 🔥 24 hrs check
         LocalDateTime last24hrs = LocalDateTime.now().minusHours(24);
 
         boolean exists = repo.existsRecentLead(
                 lead.getPhone(),
                 last24hrs
         );
+
+        if (exists) {
+            // 🔥 ignore duplicate within 24 hrs
+            return;
+        }
 
         Optional<Lead> existing = repo.findByPhone(lead.getPhone());
 
@@ -41,7 +45,7 @@ public class LeadService {
             old.setCourse(lead.getCourse());
             old.setCity(lead.getCity());
             old.setMessage(lead.getMessage());
-            old.setCreatedAt(LocalDateTime.now()); // refresh time
+            old.setCreatedAt(LocalDateTime.now());
 
             repo.save(old);
             return;
@@ -50,7 +54,8 @@ public class LeadService {
         repo.save(lead);
     }
     public void updateStatus(String phone, String status) {
-        Lead lead = repo.findByPhone(phone).orElseThrow();
+        Lead lead = repo.findByPhone(phone)
+                .orElseThrow(() -> new RuntimeException("Lead not found: " + phone));
 
         lead.setStatus(status);
         repo.save(lead);
@@ -72,8 +77,7 @@ public class LeadService {
             return repo.findByDeletedFalse(pageable);
         }
 
-        return repo.findByNameContainingIgnoreCaseOrPhoneContainingAndDeletedFalse(
-                search, search, pageable);
+        return repo.searchLeads(search, pageable);
     }
 
     public Page<Lead> getDeletedLeads(int page, int size) {
@@ -117,9 +121,14 @@ public class LeadService {
 
     public void updateFollowUp(String phone, String date) {
 
-        Lead lead = repo.findByPhone(phone).orElseThrow();
+        Lead lead = repo.findByPhone(phone)
+                .orElseThrow(() -> new RuntimeException("Lead not found: " + phone));
 
-        lead.setFollowUpDate(LocalDate.parse(date));
+        try {
+            lead.setFollowUpDate(LocalDate.parse(date));
+        } catch (Exception e) {
+            throw new RuntimeException("Invalid date format");
+        }
 
         repo.save(lead);
     }

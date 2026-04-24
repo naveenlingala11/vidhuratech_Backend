@@ -15,4 +15,6 @@ public class CheckoutRequest {
     private String couponCode;
 
     private Boolean installmentEnabled;
+
+    private Long batchId;
 }
