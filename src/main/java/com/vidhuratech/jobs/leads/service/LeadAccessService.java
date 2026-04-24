@@ -2,6 +2,7 @@ package com.vidhuratech.jobs.leads.service;
 
 import com.vidhuratech.jobs.leads.entity.LeadAccess;
 import com.vidhuratech.jobs.leads.repository.LeadAccessRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -19,9 +20,10 @@ public class LeadAccessService {
     }
 
     // 🔥 admin grant access
+    @Transactional
     public void grantAccess(String phone) {
         LeadAccess access = repo.findByPhone(phone)
-                .orElse(new LeadAccess());
+                .orElseGet(LeadAccess::new);
 
         access.setPhone(phone);
         access.setAccess(true);

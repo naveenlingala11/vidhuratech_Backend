@@ -17,8 +17,13 @@ public interface LeadRepository extends JpaRepository<Lead, Long> {
 
     Optional<Lead> findByPhone(String phone);
 
-    Page<Lead> findByNameContainingIgnoreCaseOrPhoneContainingAndDeletedFalse(
-            String name, String phone, Pageable pageable);
+    @Query("""
+SELECT l FROM Lead l 
+WHERE l.deleted = false 
+AND (LOWER(l.name) LIKE LOWER(CONCAT('%', :search, '%')) 
+     OR l.phone LIKE CONCAT('%', :search, '%'))
+""")
+    Page<Lead> searchLeads(String search, Pageable pageable);
 
     long countByStatus(String status);
     Page<Lead> findByDeletedFalse(Pageable pageable);

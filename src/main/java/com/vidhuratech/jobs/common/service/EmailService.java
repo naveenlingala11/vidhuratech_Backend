@@ -4,7 +4,9 @@ import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.mail.javamail.*;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -37,6 +39,7 @@ public class EmailService {
         }
     }
 
+    @Async
     public void sendHtmlEmailWithAttachment(
             String to,
             String subject,
@@ -55,15 +58,46 @@ public class EmailService {
             helper.setText(htmlContent, true);
             helper.setFrom("support@vidhuratech.com");
 
-            helper.addAttachment(
-                    fileName,
-                    new ByteArrayResource(attachmentBytes)
-            );
+            // 🔥 ALWAYS TRY
+            helper.addAttachment(fileName, new ByteArrayResource(attachmentBytes));
 
             mailSender.send(message);
 
         } catch (Exception e) {
-            log.error("Failed to send email with attachment to {}", to, e);
+            log.error("Attachment failed, fallback to normal email", e);
+
+            // ✅ fallback
+            sendHtmlEmail(to, subject,
+                    htmlContent + "<br><br>⚠️ Attachment failed. Contact support.");
+        }
+    }
+
+    @Async
+    public void sendOtpEmailWithLogo(
+            String to,
+            String subject,
+            String htmlContent
+    ) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+
+            MimeMessageHelper helper =
+                    new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setText(htmlContent, true);
+            helper.setFrom("support@vidhuratech.com");
+
+            ClassPathResource image =
+                    new ClassPathResource("static/VidhuraTechLogo.png");
+
+            helper.addInline("logoImage", image);
+
+            mailSender.send(message);
+
+        } catch (Exception e) {
+            log.error("Email send failed", e);
         }
     }
 }

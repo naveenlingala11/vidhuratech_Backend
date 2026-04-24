@@ -6,64 +6,84 @@ import org.springframework.stereotype.Service;
 @Service
 public class InvoiceEmailTemplateService {
 
-    public String buildWelcomeInvoiceEmail(Invoice invoice) {
+    public String buildPremiumInvoiceEmail(Invoice invoice) {
 
         return """
-            <div style='font-family:Arial;padding:30px;background:#f8fafc'>
-                <div style='max-width:700px;margin:auto;background:#fff;padding:40px;border-radius:16px'>
-                    
-                    <h1 style='color:#0f172a;'>Welcome to Vidhura Tech 🚀</h1>
+        <div style="font-family:'Segoe UI',Arial;background:#f4f6f8;padding:40px">
 
-                    <p>Hi <b>%s</b>,</p>
+            <div style="max-width:700px;margin:auto;background:#ffffff;border-radius:16px;padding:40px">
 
-                    <p>
-                        Thank you for trusting <b>Vidhura Tech</b> and enrolling in our program.
-                        We’re excited to be part of your learning journey.
-                    </p>
+                <h2 style="color:#0d6efd;">🎉 Payment Successful</h2>
 
-                    <p>
-                        Your payment has been successfully verified and your access has been activated.
-                    </p>
+                <p style="font-size:16px;">
+                    Hi <b>%s</b>,
+                </p>
 
-                    <hr>
+                <p style="color:#555;">
+                    Welcome to <b>Vidhura Tech</b> 🚀 <br>
+                    Your payment has been successfully processed and your enrollment is now confirmed.
+                </p>
 
-                    <h3>Invoice Details</h3>
+                <hr style="margin:25px 0;">
 
-                    <table style='width:100%%;border-collapse:collapse'>
-                        <tr><td><b>Invoice ID</b></td><td>%s</td></tr>
-                        <tr><td><b>Course</b></td><td>%s</td></tr>
-                        <tr><td><b>Batch</b></td><td>%s</td></tr>
-                        <tr><td><b>Amount Paid</b></td><td>₹%.2f</td></tr>
-                        <tr><td><b>Payment Status</b></td><td>PAID</td></tr>
-                    </table>
+                <h3 style="color:#0f172a;">📄 Invoice Details</h3>
 
-                    <hr>
+                <table style="width:100%%;border-collapse:collapse;font-size:14px">
+                    <tr><td><b>Invoice ID</b></td><td>%s</td></tr>
+                    <tr><td><b>Course</b></td><td>%s</td></tr>
+                    <tr><td><b>Batch</b></td><td>%s</td></tr>
+                    <tr>
+                        <td><b>Amount Paid</b></td>
+                        <td style="color:#16a34a;"><b>₹%.2f</b></td>
+                    </tr>
+                    <tr>
+                        <td><b>Status</b></td>
+                        <td style="color:green;">PAID</td>
+                    </tr>
+                </table>
 
-                    <p>
-                        <b>What’s Next?</b><br>
-                        • Join WhatsApp Group<br>
-                        • Access Student Dashboard<br>
-                        • Attend Live Sessions<br>
-                        • Start Building Projects
-                    </p>
+                <hr style="margin:25px 0;">
 
-                    <br>
+                <h3>🚀 What Happens Next?</h3>
 
-                    <p>
-                        We sincerely appreciate your trust in us.<br>
-                        Let’s build your career together 💙
-                    </p>
+                <ul style="color:#555;line-height:1.8;">
+                    <li>
+                        👉 Join WhatsApp Group: 
+                        <a href="https://chat.whatsapp.com/GAkHYqCG9ScBH8hQAUHkzt" 
+                           style="color:#0d6efd;text-decoration:none;">
+                           Click here to join
+                        </a>
+                    </li>
 
-                    <br>
+                    <li>📚 You will receive course access details shortly</li>
 
-                    <p>
-                        Regards,<br>
-                        <b>Team Vidhura Tech</b><br>
-                        support@vidhuratech.com
-                    </p>
+                    <li>
+                        🎥 Zoom / Live session invite link will be shared 
+                        <b>1 day before the class starts</b>
+                    </li>
 
-                </div>
+                    <li>🧠 Attend live sessions and clarify doubts</li>
+
+                    <li>💻 Start building real-time projects</li>
+                </ul>
+
+                <hr style="margin:25px 0;">
+
+                <p style="color:#555;">
+                    If you have any questions or need assistance, feel free to reach out anytime.<br><br>
+
+                    📧 support@vidhuratech.com<br>
+                    📞 +91 9108057464
+                </p>
+
+                <p style="margin-top:30px;">
+                    Regards,<br>
+                    <b>Team Vidhura Tech 💙</b>
+                </p>
+
             </div>
+
+        </div>
         """.formatted(
                 invoice.getName(),
                 invoice.getId(),

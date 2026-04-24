@@ -25,6 +25,7 @@ public class Invoice {
 
     private String course;
     private String batch;
+    private Long batchId;
     private String trainer;
 
     private Double amount;
@@ -53,13 +54,26 @@ public class Invoice {
         }
     }
 
+    // ================= PAYMENT EXTRA =================
+
     private String utrNumber;
 
     private String paymentScreenshotUrl;
 
-    private Boolean paymentVerified = false;
+    private Boolean paymentVerified;
 
     private LocalDateTime verifiedAt;
 
     private String verifiedBy;
+
+    // ================= RAZORPAY (🔥 IMPORTANT) =================
+
+    @Column(name = "razorpay_order_id")
+    private String razorpayOrderId;
+
+    @Column(name = "razorpay_payment_id")
+    private String razorpayPaymentId;
+
+    @Column(name = "razorpay_signature")
+    private String razorpaySignature;
 }
