@@ -1,4 +1,4 @@
-package com.vidhuratech.jobs.jobs.config;
+package com.vidhuratech.jobs.common.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

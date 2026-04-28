@@ -22,4 +22,9 @@ public class CourseRequestDTO {
     private CourseLevel level;
 
     private Integer durationHours;
+
+    @NotNull
+    private Double price;
+
+    private String metadataJson;
 }

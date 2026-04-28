@@ -4,10 +4,7 @@ import com.vidhuratech.jobs.common.api.ApiResponse;
 import com.vidhuratech.jobs.lms.student.service.StudentLmsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/student/lms")
@@ -41,6 +38,17 @@ public class StudentLmsController {
         return ApiResponse.builder()
                 .success(true)
                 .data(service.getCurriculum(batchId))
+                .build();
+    }
+
+    @GetMapping("/public/curriculum")
+    public ApiResponse<?> preview(@RequestParam Long batchId) {
+
+        return ApiResponse.builder()
+                .success(true)
+                .data(
+                        service.getCurriculumPreview(batchId)
+                )
                 .build();
     }
 }

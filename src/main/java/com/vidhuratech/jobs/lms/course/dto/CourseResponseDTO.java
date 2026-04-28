@@ -21,4 +21,7 @@ public class CourseResponseDTO {
     private Integer durationHours;
     private Boolean active;
     private LocalDateTime createdAt;
+    private Double price;
+
+    private String metadataJson;
 }

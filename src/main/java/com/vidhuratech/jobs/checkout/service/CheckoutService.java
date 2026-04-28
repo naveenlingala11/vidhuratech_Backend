@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -35,6 +36,7 @@ import javax.crypto.spec.SecretKeySpec;
 
 import org.json.JSONObject;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @Slf4j
@@ -47,11 +49,11 @@ public class CheckoutService {
     private final EmailService emailService;
     private final InvoiceEmailTemplateService templateService;
 
-    @Value("${razorpay.secret}")
-    private String razorpaySecret;
-
-    @Value("${razorpay.key}")
+    @Value("${RAZORPAY_KEY_ID}")
     private String razorpayKey;
+
+    @Value("${RAZORPAY_KEY_SECRET}")
+    private String razorpaySecret;
 
     @Autowired
     private UserRepository userRepo;
@@ -72,7 +74,13 @@ public class CheckoutService {
     public Map<String, Object> initiateCheckout(CheckoutRequest request) {
 
         try {
-
+            log.error("KEY: " + razorpayKey);
+            log.error("SECRET: " + razorpaySecret);
+            if (request.getAmount() == null || request.getAmount() * 100 < 100) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Minimum amount is ₹1"
+                );            }
             Lead lead = request.getLead();
             lead.setSource("PURCHASE");
             lead.setStatus("Payment Pending");
@@ -122,8 +130,10 @@ public class CheckoutService {
             );
 
         } catch (Exception e) {
-            throw new RuntimeException("Checkout failed", e);
-        }
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Checkout failed: " + e.getMessage()
+            );        }
     }
 
     public Map<String, Object> getPaymentStatus(String phone, String invoiceId) {
@@ -159,7 +169,6 @@ public class CheckoutService {
         Invoice invoice = invoiceRepo.findById(invoiceId)
                 .orElseThrow(() -> new RuntimeException("Invoice not found"));
 
-        invoice.setBatchId(batchId);
         invoice.setPaymentStatus("PAID");
         invoice.setPaidAmount(invoice.getAmount());
         invoice.setRemainingAmount(0.0);
@@ -209,8 +218,12 @@ public class CheckoutService {
             log.error("Batch ID is NULL for invoice: {}", invoice.getId());
             throw new RuntimeException("Batch ID missing. Contact support.");
         }
-        Batch batch = batchRepository.findById(invoice.getBatchId())
-                .orElseThrow(() -> new RuntimeException("Batch not found: " + invoice.getBatchId()));
+        Long batchIdFromInvoice = invoice.getBatchId();
+
+        Batch batch = batchRepository.findById(batchIdFromInvoice)
+                .orElseThrow(() -> new RuntimeException("Batch not found: " + batchIdFromInvoice));
+        System.out.println("INVOICE BATCH ID: " + invoice.getBatchId());
+        System.out.println("FRONTEND BATCH ID: " + batchId);
 
         boolean alreadyEnrolled =
                 enrollmentRepo.existsByBatchIdAndStudentId(
@@ -369,5 +382,15 @@ public class CheckoutService {
 
         // ✅ SEND EMAIL WITH FRONTEND PDF
         sendSuccessEmail(invoice, invoicePdf);
+    }
+
+    public boolean verifyPaymentSignature(String orderId, String paymentId, String signature) {
+        try {
+            String payload = orderId + "|" + paymentId;
+            String generated = hmacSha256(payload, razorpaySecret);
+            return generated.equals(signature);
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

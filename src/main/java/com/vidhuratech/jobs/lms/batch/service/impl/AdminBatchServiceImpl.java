@@ -120,4 +120,5 @@ public class AdminBatchServiceImpl implements AdminBatchService {
     public void deleteBatch(Long id) {
         batchRepository.deleteById(id);
     }
+
 }

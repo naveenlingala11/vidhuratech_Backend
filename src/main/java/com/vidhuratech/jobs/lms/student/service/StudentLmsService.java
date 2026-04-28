@@ -6,7 +6,9 @@ import com.vidhuratech.jobs.lms.batch.repository.BatchSessionRepository;
 import com.vidhuratech.jobs.trainer.entity.Curriculum;
 import com.vidhuratech.jobs.trainer.repository.CurriculumRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -18,9 +20,10 @@ public class StudentLmsService {
     private final BatchEnrollmentRepository enrollmentRepository;
     private final BatchSessionRepository sessionRepository;
     private final CurriculumRepository curriculumRepository;
+    private final SecurityUtils securityUtils;
 
     public List<?> getMyBatches() {
-        String email = SecurityUtils.getCurrentUserEmail();
+        String email = securityUtils.getCurrentUserEmail();
 
         return enrollmentRepository.findBatchesByStudentEmail(email)
                 .stream()
@@ -46,7 +49,7 @@ public class StudentLmsService {
 
     public Object getCurriculum(Long batchId) {
 
-        String email = SecurityUtils.getCurrentUserEmail();
+        String email = securityUtils.getCurrentUserEmail();
 
         // ✅ CHECK student enrolled
         boolean enrolled = enrollmentRepository
@@ -55,8 +58,15 @@ public class StudentLmsService {
                 .anyMatch(b -> b.getId().equals(batchId));
 
         if (!enrolled) {
-            throw new RuntimeException("Access denied");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access Denied");
         }
+
+        return curriculumRepository.findByBatchId(batchId)
+                .map(Curriculum::getJsonData)
+                .orElse(null);
+    }
+
+    public Object getCurriculumPreview(Long batchId) {
 
         return curriculumRepository.findByBatchId(batchId)
                 .map(Curriculum::getJsonData)

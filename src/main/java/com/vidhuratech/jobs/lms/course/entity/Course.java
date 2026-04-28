@@ -59,4 +59,10 @@ public class Course {
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();
     }
+
+    @Column(nullable = false)
+    private Double price;
+
+    @Column(columnDefinition = "TEXT")
+    private String metadataJson;
 }
