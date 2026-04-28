@@ -9,7 +9,6 @@ import com.vidhuratech.jobs.invoice.repository.InvoiceRepository;
 import com.vidhuratech.jobs.invoice.service.InvoiceEmailTemplateService;
 import com.vidhuratech.jobs.leads.entity.Lead;
 import com.vidhuratech.jobs.leads.repository.LeadRepository;
-import com.vidhuratech.jobs.leads.service.LeadAccessService;
 import com.vidhuratech.jobs.lms.batch.entity.Batch;
 import com.vidhuratech.jobs.lms.batch.entity.BatchEnrollment;
 import com.vidhuratech.jobs.lms.batch.repository.BatchEnrollmentRepository;
@@ -45,7 +44,6 @@ public class CheckoutService {
 
     private final LeadRepository leadRepo;
     private final InvoiceRepository invoiceRepo;
-    private final LeadAccessService accessService;
     private final EmailService emailService;
     private final InvoiceEmailTemplateService templateService;
 
@@ -184,8 +182,6 @@ public class CheckoutService {
 
         lead.setStatus("Joined");
         leadRepo.save(lead);
-
-        accessService.grantAccess(lead.getPhone());
 
         // ✅ SEND EMAIL WITH FRONTEND PDF
         sendSuccessEmail(invoice, invoicePdf);
