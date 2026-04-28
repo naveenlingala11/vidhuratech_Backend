@@ -29,6 +29,7 @@ public class BatchServiceImpl implements BatchService {
     private final BatchEnrollmentRepository enrollmentRepository;
     private final UserRepository userRepository;
     private final CourseRepository courseRepository;
+    private final SecurityUtils securityUtils;
 
     @Override
     public BatchResponseDTO getBatchById(Long id) {
@@ -49,7 +50,7 @@ public class BatchServiceImpl implements BatchService {
 
     private Batch getTrainerOwnedBatch(Long id) {
 
-        String email = SecurityUtils.getCurrentUserEmail();
+        String email = securityUtils.getCurrentUserEmail();
 
         return batchRepository.findByIdAndTrainerEmail(id, email)
                 .orElseThrow(() ->
@@ -210,18 +211,11 @@ public class BatchServiceImpl implements BatchService {
     @Override
     public Batch getActiveBatchByCourse(Long courseId) {
 
-        // ✅ try active batch
-        Optional<Batch> active =
-                batchRepository.findActiveBatch(courseId);
-
-        if (active.isPresent()) {
-            return active.get();
-        }
-
-        // ✅ fallback latest batch
-        Optional<Batch> latest =
-                batchRepository.findTopByCourseIdOrderByStartDateDesc(courseId);
-
-        return latest.orElse(null); // 🔥 IMPORTANT (NO ERROR)
+        return batchRepository
+                .findTopByCourseIdAndStatusAndActiveTrueOrderByStartDateDesc(
+                        courseId,
+                        BatchStatus.ACTIVE
+                )
+                .orElse(null);
     }
 }

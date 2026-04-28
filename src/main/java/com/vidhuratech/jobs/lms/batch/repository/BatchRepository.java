@@ -1,6 +1,7 @@
 package com.vidhuratech.jobs.lms.batch.repository;
 
 import com.vidhuratech.jobs.lms.batch.entity.Batch;
+import com.vidhuratech.jobs.lms.batch.entity.BatchStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -26,4 +27,9 @@ public interface BatchRepository extends JpaRepository<Batch, Long>, JpaSpecific
     AND b.active = true
     """)
     Optional<Batch> findActiveBatch(Long courseId);
+
+ Optional<Batch> findTopByCourseIdAndStatusAndActiveTrueOrderByStartDateDesc(
+         Long courseId,
+         BatchStatus status
+ );
 }

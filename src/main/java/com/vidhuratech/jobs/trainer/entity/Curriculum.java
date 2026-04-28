@@ -19,7 +19,6 @@ public class Curriculum {
 
     private String trainerEmail;
 
-    @Lob
     @Column(columnDefinition = "TEXT")
     private String jsonData;
 }

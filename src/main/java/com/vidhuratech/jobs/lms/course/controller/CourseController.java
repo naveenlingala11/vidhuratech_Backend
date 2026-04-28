@@ -9,13 +9,16 @@ import org.springframework.data.domain.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
-@RequestMapping("/api/lms/courses")
+@RequestMapping("/api/lms/courses") // ✅ IMPORTANT
 @RequiredArgsConstructor
 public class CourseController {
 
     private final CourseService service;
 
+    // ================= CREATE =================
     @PostMapping
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','TRAINER')")
     public ApiResponse<CourseResponseDTO> create(
@@ -28,6 +31,20 @@ public class CourseController {
                 .build();
     }
 
+    // ================= BULK UPLOAD =================
+    @PostMapping("/bulk")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
+    public ApiResponse<BulkCourseResponse> bulkCreate(
+            @RequestBody List<CourseRequestDTO> courses
+    ) {
+        return ApiResponse.<BulkCourseResponse>builder()
+                .success(true)
+                .message("Bulk upload completed")
+                .data(service.bulkCreate(courses))
+                .build();
+    }
+
+    // ================= UPDATE =================
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','TRAINER')")
     public ApiResponse<CourseResponseDTO> update(
@@ -41,6 +58,7 @@ public class CourseController {
                 .build();
     }
 
+    // ================= GET BY ID =================
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','TRAINER','MENTOR','STUDENT')")
     public ApiResponse<CourseResponseDTO> getById(@PathVariable Long id) {
@@ -50,6 +68,7 @@ public class CourseController {
                 .build();
     }
 
+    // ================= SEARCH =================
     @GetMapping
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','TRAINER','MENTOR')")
     public ApiResponse<Page<CourseResponseDTO>> search(
@@ -62,6 +81,7 @@ public class CourseController {
                 .build();
     }
 
+    // ================= PUBLISH =================
     @PatchMapping("/{id}/publish")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
     public ApiResponse<Void> publish(@PathVariable Long id) {
@@ -73,6 +93,7 @@ public class CourseController {
                 .build();
     }
 
+    // ================= ARCHIVE =================
     @PatchMapping("/{id}/archive")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
     public ApiResponse<Void> archive(@PathVariable Long id) {
@@ -84,6 +105,7 @@ public class CourseController {
                 .build();
     }
 
+    // ================= DELETE =================
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
     public ApiResponse<Void> delete(@PathVariable Long id) {

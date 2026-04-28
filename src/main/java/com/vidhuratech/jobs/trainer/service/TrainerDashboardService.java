@@ -1,5 +1,6 @@
 package com.vidhuratech.jobs.trainer.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vidhuratech.jobs.dashboard.dto.DashboardStatsResponse;
 import com.vidhuratech.jobs.lms.batch.repository.BatchRepository;
 import com.vidhuratech.jobs.common.security.SecurityUtils;
@@ -16,13 +17,14 @@ public class TrainerDashboardService {
 
     private final BatchRepository batchRepository;
     private final CurriculumRepository curriculumRepository;
+    private final SecurityUtils securityUtils;
 
     /* =========================
        DASHBOARD
     ========================= */
     public DashboardStatsResponse getDashboard() {
 
-        String email = SecurityUtils.getCurrentUserEmail();
+        String email = securityUtils.getCurrentUserEmail();
 
         long assignedBatches =
                 batchRepository.countByTrainerEmail(email);
@@ -53,7 +55,7 @@ public class TrainerDashboardService {
     ========================= */
     public List<Map<String, Object>> getBatches() {
 
-        String email = SecurityUtils.getCurrentUserEmail();
+        String email = securityUtils.getCurrentUserEmail();
 
         return batchRepository.findByTrainerEmail(email)
                 .stream()
@@ -77,11 +79,19 @@ public class TrainerDashboardService {
     /* =========================
        CURRICULUM SAVE (UPSERT)
     ========================= */
+    private final ObjectMapper objectMapper;
+
     public void saveOrUpdateCurriculum(Long batchId, String json) {
 
-        String email = SecurityUtils.getCurrentUserEmail();
+        try {
+            // ✅ Validate JSON
+            objectMapper.readTree(json);
+        } catch (Exception e) {
+            throw new RuntimeException("Invalid JSON format");
+        }
 
-        // ✅ SECURITY CHECK
+        String email = securityUtils.getCurrentUserEmail();
+
         batchRepository.findByIdAndTrainerEmail(batchId, email)
                 .orElseThrow(() -> new RuntimeException("Access denied"));
 
@@ -103,18 +113,24 @@ public class TrainerDashboardService {
 
         curriculumRepository.save(c);
     }
-
     /* =========================
        GET CURRICULUM
     ========================= */
     public Optional<Curriculum> getCurriculum(Long batchId) {
 
-        String email = SecurityUtils.getCurrentUserEmail();
+        String email = securityUtils.getCurrentUserEmail();
 
         // ✅ Only trainer who owns batch
         batchRepository.findByIdAndTrainerEmail(batchId, email)
                 .orElseThrow(() -> new RuntimeException("Access denied"));
 
         return curriculumRepository.findByBatchId(batchId);
+    }
+
+    public String getCurriculumPreview(Long batchId) {
+
+        Optional<Curriculum> c = curriculumRepository.findByBatchId(batchId);
+
+        return c.map(Curriculum::getJsonData).orElse(null);
     }
 }

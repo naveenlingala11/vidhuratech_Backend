@@ -16,6 +16,7 @@ public class StudentProgressService {
 
     private final StudentProgressRepository repo;
     private final BatchSessionRepository sessionRepository;
+    private final SecurityUtils securityUtils;
 
     /* =========================
        MARK COMPLETED
@@ -23,7 +24,7 @@ public class StudentProgressService {
     @Transactional
     public void markCompleted(Long batchId, Long sessionId) {
 
-        String email = SecurityUtils.getCurrentUserEmail();
+        String email = securityUtils.getCurrentUserEmail();
 
         StudentProgress p = repo
                 .findByStudentEmailAndBatchIdAndSessionId(email, batchId, sessionId)
@@ -44,7 +45,7 @@ public class StudentProgressService {
     @Transactional
     public void updateLastWatched(Long batchId, Long sessionId) {
 
-        String email = SecurityUtils.getCurrentUserEmail();
+        String email = securityUtils.getCurrentUserEmail();
 
         repo.clearLastWatched(email, batchId);
 
@@ -67,7 +68,7 @@ public class StudentProgressService {
     @Transactional
     public void updateResumeWithTime(Long batchId, Long sessionId, Long time) {
 
-        String email = SecurityUtils.getCurrentUserEmail();
+        String email = securityUtils.getCurrentUserEmail();
 
         repo.clearLastWatched(email, batchId);
 
@@ -90,7 +91,7 @@ public class StudentProgressService {
     ========================= */
     public int getProgress(Long batchId) {
 
-        String email = SecurityUtils.getCurrentUserEmail();
+        String email = securityUtils.getCurrentUserEmail();
 
         long total = sessionRepository
                 .findByBatchIdAndPublishedTrueOrderBySessionDateAsc(batchId)
@@ -109,7 +110,7 @@ public class StudentProgressService {
     ========================= */
     public Map<String, Object> getResumeData(Long batchId) {
 
-        String email = SecurityUtils.getCurrentUserEmail();
+        String email = securityUtils.getCurrentUserEmail();
 
         return repo.findLastWatched(email, batchId)
                 .map(p -> Map.<String, Object>of(

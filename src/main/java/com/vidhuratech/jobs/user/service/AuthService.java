@@ -1,13 +1,12 @@
 package com.vidhuratech.jobs.user.service;
 
+import com.vidhuratech.jobs.common.security.JwtUtil;
 import com.vidhuratech.jobs.user.dto.AuthResponse;
-import com.vidhuratech.jobs.user.dto.CreateEmployeeDTO;
 import com.vidhuratech.jobs.user.dto.LoginRequest;
 import com.vidhuratech.jobs.user.dto.RegisterRequest;
 import com.vidhuratech.jobs.user.entity.User;
 import com.vidhuratech.jobs.user.enums.UserRole;
 import com.vidhuratech.jobs.user.repository.UserRepository;
-import com.vidhuratech.jobs.common.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -20,9 +19,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
 
-    // ✅ REGISTER
     public AuthResponse register(RegisterRequest request) {
-
         if (userRepo.existsByEmail(request.getEmail())) {
             throw new RuntimeException("Email already exists");
         }
@@ -34,23 +31,14 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRole(UserRole.STUDENT);
         user.setActive(true);
-        user.setFirstLogin(false); // ✅ normal register
+        user.setFirstLogin(false);
 
         userRepo.save(user);
 
-        String token = jwtUtil.generateToken(user);
-
-        return AuthResponse.builder()
-                .token(token)
-                .role(user.getRole())
-                .name(user.getName())
-                .firstLogin(false)
-                .build();
+        return buildAuthResponse(user, jwtUtil.generateToken(user));
     }
 
-    // ✅ LOGIN
     public AuthResponse login(LoginRequest req) {
-
         User user = userRepo.findByEmail(req.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -58,14 +46,23 @@ public class AuthService {
             throw new RuntimeException("Invalid credentials");
         }
 
-        String token = jwtUtil.generateToken(user);
+        if (Boolean.FALSE.equals(user.getActive())) {
+            throw new RuntimeException("Account is inactive");
+        }
 
+        return buildAuthResponse(user, jwtUtil.generateToken(user));
+    }
+
+    private AuthResponse buildAuthResponse(User user, String token) {
         return AuthResponse.builder()
                 .token(token)
-                .role(user.getRole())
+                .id(user.getId())
                 .name(user.getName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .role(user.getRole())
+                .active(user.getActive())
                 .firstLogin(Boolean.TRUE.equals(user.getFirstLogin()))
                 .build();
     }
-
 }

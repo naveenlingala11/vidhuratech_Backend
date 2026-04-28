@@ -1,8 +1,10 @@
 package com.vidhuratech.jobs.lms.batch.controller;
 
 import com.vidhuratech.jobs.common.api.ApiResponse;
+import com.vidhuratech.jobs.common.security.SecurityUtils;
 import com.vidhuratech.jobs.lms.batch.dto.*;
 import com.vidhuratech.jobs.lms.batch.entity.Batch;
+import com.vidhuratech.jobs.lms.batch.repository.BatchEnrollmentRepository;
 import com.vidhuratech.jobs.lms.batch.service.BatchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -16,6 +18,8 @@ import java.util.Map;
 public class BatchController {
 
     private final BatchService batchService;
+    private final BatchEnrollmentRepository enrollmentRepository;
+    private final SecurityUtils securityUtils;
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('TRAINER','ADMIN','SUPER_ADMIN')")
@@ -101,6 +105,18 @@ public class BatchController {
                 .build();
     }
 
+    @GetMapping("/{batchId}/is-enrolled")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ApiResponse<?> isEnrolled(@PathVariable Long batchId) {
+
+        Long userId = securityUtils.getCurrentUserId();
+
+        boolean enrolled =
+                enrollmentRepository.existsByBatchIdAndStudentId(batchId, userId);
+
+        return ApiResponse.success(enrolled);
+    }
+
     @DeleteMapping("/enrollments/{enrollmentId}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','HR')")
     public ApiResponse<?> removeEnrollment(
@@ -126,23 +142,39 @@ public class BatchController {
     @GetMapping("/course/{courseId}/active")
     public ApiResponse<?> getActiveBatch(@PathVariable Long courseId) {
 
-        Batch batch = batchService.getActiveBatchByCourse(courseId);
+        try {
 
-        if (batch == null) {
+            Batch batch = batchService.getActiveBatchByCourse(courseId);
+
+            if (batch == null) {
+                return ApiResponse.builder()
+                        .success(true)
+                        .data(null)
+                        .message("No batch available")
+                        .build();
+            }
+
             return ApiResponse.builder()
                     .success(true)
-                    .data(null) // 🔥 no error
-                    .message("No batch available")
+                    .data(Map.of(
+                            "id", batch.getId(),
+                            "name", batch.getName() != null ? batch.getName() : "",
+                            "startDate", batch.getStartDate(),
+                            "status", batch.getStatus() != null ? batch.getStatus().name() : "UPCOMING",
+
+                            // 🔥 SAFE NULL HANDLING
+                            "courseName", batch.getCourse() != null ? batch.getCourse().getTitle() : "",
+                            "trainerName", batch.getTrainer() != null ? batch.getTrainer().getName() : ""
+                    ))
+                    .build();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+
+            return ApiResponse.builder()
+                    .success(false)
+                    .message("Failed to fetch batch")
                     .build();
         }
-
-        return ApiResponse.builder()
-                .success(true)
-                .data(Map.of(
-                        "id", batch.getId(),
-                        "name", batch.getName(),
-                        "startDate", batch.getStartDate()
-                ))
-                .build();
     }
 }

@@ -13,13 +13,17 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class RazorpayService {
 
-    @Value("${razorpay.key}")
+    @Value("${RAZORPAY_KEY_ID}")
     private String key;
 
-    @Value("${razorpay.secret}")
+    @Value("${RAZORPAY_KEY_SECRET}")
     private String secret;
 
     public Map<String, Object> createOrder(Double amount) {
+
+        if (amount < 1) {
+            throw new RuntimeException("Minimum amount is ₹1");
+        }
 
         try {
             RazorpayClient client = new RazorpayClient(key, secret);
@@ -39,7 +43,7 @@ public class RazorpayService {
             );
 
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Order creation failed");
         }
     }
 }

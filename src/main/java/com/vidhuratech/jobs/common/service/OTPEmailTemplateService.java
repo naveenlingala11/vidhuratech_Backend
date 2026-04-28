@@ -87,4 +87,64 @@ public class OTPEmailTemplateService {
     </div>
     """.formatted(name, otp);
     }
+
+    public String buildPasswordResetTemplate(String name, String resetLink) {
+        return """
+<div style="background:#f4f7fb;padding:30px;font-family:'Segoe UI',Arial,sans-serif">
+  <div style="max-width:600px;margin:auto;background:#ffffff;border-radius:14px;
+              box-shadow:0 10px 30px rgba(0,0,0,0.08);overflow:hidden">
+
+    <div style="background:linear-gradient(135deg,#0d223f,#122b4f);padding:22px;text-align:center">
+      <img src="cid:logoImage" alt="Vidhura Tech" style="height:60px;margin-bottom:10px"/>
+      <h2 style="color:#ffffff;margin:0;font-weight:700">Vidhura Tech</h2>
+      <p style="color:#cbd5e1;margin:5px 0 0">Secure Password Reset</p>
+    </div>
+
+    <div style="padding:32px;text-align:center">
+      <h3 style="color:#111827;margin-bottom:10px">Reset Your Password</h3>
+
+      <p style="color:#6b7280;font-size:15px">
+        Hello <strong>%s</strong>,
+      </p>
+
+      <p style="color:#6b7280;font-size:14px;line-height:1.6">
+        We received a request to reset your password. Click the button below to create a new password.
+      </p>
+
+      <a href="%s"
+         style="display:inline-block;margin:24px 0;padding:14px 26px;
+                background:linear-gradient(135deg,#facc15,#f97316);
+                color:#111827;text-decoration:none;border-radius:12px;
+                font-weight:800">
+        Set New Password
+      </a>
+
+      <p style="color:#ef4444;font-size:13px;margin-top:8px">
+        This link is valid for 24 hours.
+      </p>
+
+      <p style="color:#9ca3af;font-size:12px;margin-top:20px;line-height:1.5">
+        If the button does not work, copy and paste this link into your browser:<br/>
+        <span style="color:#2563eb">%s</span>
+      </p>
+
+      <p style="color:#9ca3af;font-size:12px;margin-top:20px">
+        If you did not request this, please ignore this email.
+      </p>
+    </div>
+
+    <div style="background:#f9fafb;padding:20px;text-align:center;border-top:1px solid #e5e7eb">
+      <p style="margin:0;font-size:13px;color:#6b7280">
+        © 2026 Vidhura Tech. All rights reserved.
+      </p>
+      <p style="margin:5px 0 0;font-size:12px;color:#9ca3af">
+        support@vidhuratech.com
+      </p>
+    </div>
+
+  </div>
+</div>
+""".formatted(name, resetLink, resetLink);
+    }
+
 }
