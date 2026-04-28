@@ -2,7 +2,6 @@ package com.vidhuratech.jobs.leads.controller;
 
 import com.vidhuratech.jobs.leads.entity.Lead;
 import com.vidhuratech.jobs.leads.repository.LeadRepository;
-import com.vidhuratech.jobs.leads.service.LeadAccessService;
 import com.vidhuratech.jobs.leads.service.LeadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -19,7 +18,6 @@ import java.util.Map;
 public class LeadController {
 
     private final LeadService service;
-    private final LeadAccessService accessService;
     private final LeadRepository repository;
 
     // ✅ SAVE FORM
@@ -37,13 +35,7 @@ public class LeadController {
     @PostMapping("/status")
     public void updateStatus(@RequestParam String phone,
                              @RequestParam String status) {
-
         service.updateStatus(phone, status);
-
-        // 🔥 IF JOINED → GRANT ACCESS
-        if ("Joined".equalsIgnoreCase(status)) {
-            accessService.grantAccess(phone);
-        }
     }
 
     @GetMapping("/all")

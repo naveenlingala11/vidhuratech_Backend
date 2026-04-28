@@ -22,35 +22,46 @@ public class LeadService {
     private final LeadRepository repo;
 
     public void saveLead(Lead lead) {
-
-        LocalDateTime last24hrs = LocalDateTime.now().minusHours(24);
-
-        boolean exists = repo.existsRecentLead(
-                lead.getPhone(),
-                last24hrs
-        );
-
-        if (exists) {
-            // 🔥 ignore duplicate within 24 hrs
-            return;
+        if (lead == null) {
+            throw new RuntimeException("Invalid request");
         }
 
-        Optional<Lead> existing = repo.findByPhone(lead.getPhone());
+        String rawPhone = lead.getPhone() == null ? "" : lead.getPhone().replaceAll("\\D", "");
+        if (rawPhone.isBlank()) {
+            throw new RuntimeException("Phone is required");
+        }
+
+        if (rawPhone.length() > 15) {
+            rawPhone = rawPhone.substring(rawPhone.length() - 15);
+        }
+
+        lead.setPhone(rawPhone);
+
+        if (lead.getName() != null) lead.setName(lead.getName().trim());
+        if (lead.getEmail() != null) lead.setEmail(lead.getEmail().trim());
+        if (lead.getCourse() != null) lead.setCourse(lead.getCourse().trim());
+        if (lead.getCity() != null) lead.setCity(lead.getCity().trim());
+        if (lead.getMessage() != null) lead.setMessage(lead.getMessage().trim());
+        if (lead.getSource() != null) lead.setSource(lead.getSource().trim());
+
+        Optional<Lead> existing = repo.findByPhone(rawPhone);
 
         if (existing.isPresent()) {
             Lead old = existing.get();
-
             old.setName(lead.getName());
             old.setEmail(lead.getEmail());
             old.setCourse(lead.getCourse());
             old.setCity(lead.getCity());
             old.setMessage(lead.getMessage());
+            old.setSource(lead.getSource());
+            old.setDeleted(false);
+            old.setDeletedAt(null);
             old.setCreatedAt(LocalDateTime.now());
-
             repo.save(old);
             return;
         }
 
+        if (lead.getDeleted() == null) lead.setDeleted(false);
         repo.save(lead);
     }
     public void updateStatus(String phone, String status) {
