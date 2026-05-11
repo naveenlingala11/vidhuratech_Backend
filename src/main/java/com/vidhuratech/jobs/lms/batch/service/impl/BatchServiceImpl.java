@@ -224,30 +224,60 @@ public class BatchServiceImpl implements BatchService {
 
         return batchRepository.findAll()
                 .stream()
-                .map(batch -> Map.of(
+                .map(batch -> {
 
-                        "id", batch.getId(),
+                    Map<String, Object> row =
+                            new java.util.HashMap<>();
 
-                        "name",
-                        batch.getName() != null
-                                ? batch.getName()
-                                : "",
+                    row.put(
+                            "id",
+                            batch.getId()
+                    );
 
-                        "courseName",
-                        batch.getCourse() != null
-                                ? batch.getCourse().getTitle()
-                                : "",
+                    row.put(
+                            "name",
+                            batch.getName() != null
+                                    ? batch.getName()
+                                    : ""
+                    );
 
-                        "trainerName",
-                        batch.getTrainer() != null
-                                ? batch.getTrainer().getName()
-                                : "",
+                    row.put(
+                            "courseName",
+                            batch.getCourse() != null
+                                    ? batch.getCourse().getTitle()
+                                    : ""
+                    );
 
-                        "status",
-                        batch.getStatus() != null
-                                ? batch.getStatus().name()
-                                : "UNKNOWN"
-                ))
+                    row.put(
+                            "trainerName",
+                            batch.getTrainer() != null
+                                    ? batch.getTrainer().getName()
+                                    : ""
+                    );
+
+                    row.put(
+                            "status",
+                            batch.getStatus() != null
+                                    ? batch.getStatus().name()
+                                    : "UNKNOWN"
+                    );
+
+                    row.put(
+                            "startDate",
+                            batch.getStartDate() != null
+                                    ? batch.getStartDate().toString()
+                                    : ""
+                    );
+
+                    row.put(
+                            "endDate",
+                            batch.getEndDate() != null
+                                    ? batch.getEndDate().toString()
+                                    : ""
+                    );
+
+                    return row;
+                })
                 .toList();
     }
 }
