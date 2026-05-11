@@ -41,4 +41,14 @@ public class Batch {
 
     @OneToMany(mappedBy = "batch", cascade = CascadeType.ALL)
     private List<BatchEnrollment> enrollments;
+
+    private String whatsappGroupLink;
+
+    private String zoomJoinLink;
+    private String zoomMeetingId;
+    private String zoomPasscode;
+
+    private String zoomSchedule;   // Daily till June 15
+    private String zoomTime;       // 07:30 PM
+    private String zoomCalendarLink;
 }

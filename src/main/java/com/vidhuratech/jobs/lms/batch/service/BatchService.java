@@ -26,4 +26,6 @@ public interface BatchService {
     List<?> getEnrollments(Long batchId);
 
     Batch getActiveBatchByCourse(Long courseId);
+
+    List<?> getAllBatchesLite();
 }

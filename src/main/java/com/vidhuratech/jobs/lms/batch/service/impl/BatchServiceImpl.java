@@ -218,4 +218,66 @@ public class BatchServiceImpl implements BatchService {
                 )
                 .orElse(null);
     }
+
+    @Override
+    public List<?> getAllBatchesLite() {
+
+        return batchRepository.findAll()
+                .stream()
+                .map(batch -> {
+
+                    Map<String, Object> row =
+                            new java.util.HashMap<>();
+
+                    row.put(
+                            "id",
+                            batch.getId()
+                    );
+
+                    row.put(
+                            "name",
+                            batch.getName() != null
+                                    ? batch.getName()
+                                    : ""
+                    );
+
+                    row.put(
+                            "courseName",
+                            batch.getCourse() != null
+                                    ? batch.getCourse().getTitle()
+                                    : ""
+                    );
+
+                    row.put(
+                            "trainerName",
+                            batch.getTrainer() != null
+                                    ? batch.getTrainer().getName()
+                                    : ""
+                    );
+
+                    row.put(
+                            "status",
+                            batch.getStatus() != null
+                                    ? batch.getStatus().name()
+                                    : "UNKNOWN"
+                    );
+
+                    row.put(
+                            "startDate",
+                            batch.getStartDate() != null
+                                    ? batch.getStartDate().toString()
+                                    : ""
+                    );
+
+                    row.put(
+                            "endDate",
+                            batch.getEndDate() != null
+                                    ? batch.getEndDate().toString()
+                                    : ""
+                    );
+
+                    return row;
+                })
+                .toList();
+    }
 }
