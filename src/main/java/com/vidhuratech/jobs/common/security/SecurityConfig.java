@@ -46,6 +46,7 @@ public class SecurityConfig {
                                 "/api/auth/resend-link",
                                 "/api/auth/validate-token",
                                 "/api/public/**",
+                                "/api/zoho/**",
                                 "/public/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
@@ -78,6 +79,7 @@ public class SecurityConfig {
                                 "MENTOR",
                                 "STUDENT"
                         )
+                        .requestMatchers("/api/lms/admin/**").hasAnyRole("ADMIN","SUPER_ADMIN","HR")
 
                         .anyRequest().authenticated()
                 )

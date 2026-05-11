@@ -9,82 +9,159 @@ public class InvoiceEmailTemplateService {
     public String buildPremiumInvoiceEmail(Invoice invoice) {
 
         return """
-        <div style="font-family:'Segoe UI',Arial;background:#f4f6f8;padding:40px">
+<div style="font-family:'Segoe UI',Arial;background:#f1f5f9;padding:30px">
 
-            <div style="max-width:700px;margin:auto;background:#ffffff;border-radius:16px;padding:40px">
+    <!-- MAIN CARD -->
+    <div style="max-width:720px;margin:auto;background:#ffffff;border-radius:18px;overflow:hidden;
+                box-shadow:0 20px 50px rgba(0,0,0,0.08)">
 
-                <h2 style="color:#0d6efd;">🎉 Payment Successful</h2>
+        <!-- HEADER -->
+        <div style="background:linear-gradient(135deg,#2563eb,#16a34a);
+                                    padding:30px;
+                                    color:#fff;
+                                    text-align:center">
+                
+                            <!-- LOGO -->
+                            <img src="https://www.vidhuratech.com/VidhuraTechLogo.png"
+                                 alt="Vidhura Tech"
+                                 style="width:120px;
+                                        margin-bottom:12px;
+                                        border-radius:12px;
+                                        background:#fff;
+                                        padding:6px;
+                                        box-shadow:0 6px 18px rgba(0,0,0,0.2);"/>
+                
+                            <h1 style="margin:0;font-size:26px;">🎉 Payment Successful</h1>
+                
+                            <p style="margin-top:8px;font-size:14px;opacity:.9">
+                                Welcome to Vidhura Tech 🚀
+                            </p>
+                
+                        </div>
 
-                <p style="font-size:16px;">
-                    Hi <b>%s</b>,
-                </p>
+        <!-- BODY -->
+        <div style="padding:32px">
 
-                <p style="color:#555;">
-                    Welcome to <b>Vidhura Tech</b> 🚀 <br>
-                    Your payment has been successfully processed and your enrollment is now confirmed.
-                </p>
+            <p style="font-size:16px;margin-bottom:10px">
+                Hi <b>%s</b>,
+            </p>
 
-                <hr style="margin:25px 0;">
+            <p style="color:#475569;margin-bottom:25px">
+                Your payment has been successfully processed and your enrollment is now confirmed.
+            </p>
 
-                <h3 style="color:#0f172a;">📄 Invoice Details</h3>
+            <!-- INVOICE CARD -->
+            <div style="border:1px solid #e2e8f0;border-radius:14px;padding:20px;margin-bottom:25px">
+                <h3 style="margin-top:0;color:#0f172a;">📄 Invoice Details</h3>
 
-                <table style="width:100%%;border-collapse:collapse;font-size:14px">
-                    <tr><td><b>Invoice ID</b></td><td>%s</td></tr>
-                    <tr><td><b>Course</b></td><td>%s</td></tr>
-                    <tr><td><b>Batch</b></td><td>%s</td></tr>
+                <table style="width:100%%;font-size:14px;color:#334155">
+                    <tr><td>Invoice ID</td><td><b>%s</b></td></tr>
+                    <tr><td>Course</td><td><b>%s</b></td></tr>
+                    <tr><td>Batch</td><td><b>%s</b></td></tr>
                     <tr>
-                        <td><b>Amount Paid</b></td>
-                        <td style="color:#16a34a;"><b>₹%.2f</b></td>
+                        <td>Amount Paid</td>
+                        <td style="color:#16a34a;font-weight:700">₹%.2f</td>
                     </tr>
                     <tr>
-                        <td><b>Status</b></td>
-                        <td style="color:green;">PAID</td>
+                        <td>Status</td>
+                        <td style="color:#16a34a;font-weight:700">PAID ✅</td>
                     </tr>
                 </table>
+            </div>
 
-                <hr style="margin:25px 0;">
+            <!-- NEXT STEPS -->
+            <h3 style="color:#0f172a;">🚀 What Happens Next?</h3>
 
-                <h3>🚀 What Happens Next?</h3>
+            <!-- WhatsApp -->
+            <div style="background:#ecfdf5;border:1px solid #bbf7d0;padding:16px;border-radius:12px;margin-bottom:12px">
+                <b>📲 Join WhatsApp Community</b><br><br>
+                <a href="https://chat.whatsapp.com/GAkHYqCG9ScBH8hQAUHkzt"
+                   style="background:#16a34a;color:#fff;padding:10px 16px;border-radius:8px;
+                          text-decoration:none;font-weight:600;display:inline-block">
+                   Join Now →
+                </a>
+            </div>
 
-                <ul style="color:#555;line-height:1.8;">
-                    <li>
-                        👉 Join WhatsApp Group: 
-                        <a href="https://chat.whatsapp.com/GAkHYqCG9ScBH8hQAUHkzt" 
-                           style="color:#0d6efd;text-decoration:none;">
-                           Click here to join
-                        </a>
-                    </li>
+            <!-- LMS -->
+            <div style="background:#eff6ff;border:1px solid #bfdbfe;padding:16px;border-radius:12px;margin-bottom:12px">
+                📚 Your course access will be activated shortly
+            </div>
 
-                    <li>📚 You will receive course access details shortly</li>
+            <!-- Zoom -->
+            <div style="background:#fef9c3;border:1px solid #fde68a;padding:16px;border-radius:12px;margin-bottom:12px">
+                🎥 Live class details are available below 👇
+            </div>
 
-                    <li>
-                        🎥 Zoom / Live session invite link will be shared 
-                        <b>1 day before the class starts</b>
-                    </li>
+            <!-- Learning -->
+            <div style="background:#f1f5f9;border:1px solid #e2e8f0;padding:16px;border-radius:12px;margin-bottom:12px">
+                🧠 Attend live sessions & clarify doubts
+            </div>
 
-                    <li>🧠 Attend live sessions and clarify doubts</li>
+            <!-- Projects -->
+            <div style="background:#faf5ff;border:1px solid #e9d5ff;padding:16px;border-radius:12px;margin-bottom:20px">
+                💻 Build real-time projects & grow your career 🚀
+            </div>
 
-                    <li>💻 Start building real-time projects</li>
-                </ul>
+            <!-- ZOOM CARD -->
+            <div style="border-radius:16px;
+                        padding:22px;
+                        background:linear-gradient(135deg,#eff6ff,#ecfdf5);
+                        border:1px solid #dbeafe;
+                        margin-bottom:25px">
 
-                <hr style="margin:25px 0;">
+                <h3 style="margin-top:0">🎥 Live Class Details</h3>
 
-                <p style="color:#555;">
-                    If you have any questions or need assistance, feel free to reach out anytime.<br><br>
+                <p><b>📘 Course:</b> Python + Data Structures</p>
+                <p><b>📅 Start:</b> May 2, 2026</p>
+                <p><b>⏰ Time:</b> 07:30 PM IST</p>
 
-                    📧 support@vidhuratech.com<br>
-                    📞 +91 9108057464
+                <!-- JOIN BUTTON -->
+                <div style="margin:15px 0">
+                    <a href="https://us06web.zoom.us/j/87114375458?pwd=k84SGuA0a0mXw6eFCoYtJcpjRbs9eo.1"
+                       style="background:#2563eb;color:#fff;padding:12px 18px;border-radius:10px;
+                              text-decoration:none;font-weight:700;display:inline-block">
+                       🚀 Join Live Class
+                    </a>
+                </div>
+
+                <p style="font-size:13px;color:#475569">
+                    🆔 Meeting ID: 871 1437 5458 <br>
+                    🔐 Passcode: 278110
                 </p>
 
-                <p style="margin-top:30px;">
-                    Regards,<br>
-                    <b>Team Vidhura Tech 💙</b>
-                </p>
+                <!-- CALENDAR -->
+                <a href="https://us06web.zoom.us/meeting/tZMsdu2rqT4uH9wgCVQjq2RlbX7_3dawgTp3/ics?icsToken=DPALmQahb4E01csChQAALAAAACKFzMAj3zx_O5HRcVsP2s5X6F2GSuk3BLGJ5ArZWHx1ZjNnXBjrcwIsTLBfsgMWkogycBLFdL6QRoEzIzAwMDAwMQ&meetingMasterEventId=MkicPAKwR2utjCV-G7HViQ"
+                   style="background:#16a34a;color:#fff;padding:8px 14px;border-radius:8px;
+                          text-decoration:none;font-weight:600;display:inline-block">
+                   📅 Add to Calendar
+                </a>
 
             </div>
 
         </div>
-        """.formatted(
+
+        <!-- FOOTER -->
+        <div style="background:#0f172a;color:#cbd5e1;padding:25px;text-align:center">
+
+            <p style="margin:0 0 10px 0;font-weight:600">
+                Need help? We're here for you 💙
+            </p>
+
+            <p style="margin:0;font-size:14px">
+                📧 support@vidhuratech.com <br>
+                📞 +91 9108057464
+            </p>
+
+            <p style="margin-top:15px;font-size:12px;opacity:.7">
+                © 2026 Vidhura Tech. All rights reserved.
+            </p>
+
+        </div>
+
+    </div>
+
+</div>
+""".formatted(
                 invoice.getName(),
                 invoice.getId(),
                 invoice.getCourse(),

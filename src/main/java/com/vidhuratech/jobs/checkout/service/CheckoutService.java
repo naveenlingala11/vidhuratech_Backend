@@ -183,9 +183,6 @@ public class CheckoutService {
         lead.setStatus("Joined");
         leadRepo.save(lead);
 
-        // ✅ SEND EMAIL WITH FRONTEND PDF
-        sendSuccessEmail(invoice, invoicePdf);
-
         Optional<User> existingUser =
                 userRepo.findByEmail(invoice.getEmail());
 
@@ -243,40 +240,48 @@ public class CheckoutService {
         // 🔥 STEP 6: SEND EMAIL WITH PDF
         // =====================================================
 
-        if (invoicePdf != null && !invoicePdf.isEmpty()) {
-            sendSuccessEmail(invoice, invoicePdf);
-        } else {
-            log.warn("Invoice PDF not received for {}", invoice.getId());
-
-            String html = templateService.buildPremiumInvoiceEmail(invoice);
-
-            emailService.sendHtmlEmail(
-                    invoice.getEmail(),
-                    "🎉 Payment Successful - Vidhura Tech",
-                    html
-            );
-        }
+        sendEmailIfNotSent(invoice, invoicePdf);
         log.info("Payment confirmed successfully for {}", invoiceId);
         System.out.println("INVOICE ID: " + invoiceId);
         System.out.println("BATCH ID: " + batchId);
         System.out.println("EMAIL: " + invoice.getEmail());
     }
-    // ================= EMAIL =================
-    private void sendSuccessEmail(Invoice invoice, MultipartFile invoicePdf) {
+
+    private void sendEmailIfNotSent(Invoice invoice, MultipartFile invoicePdf) {
+
+        if (Boolean.TRUE.equals(invoice.getEmailSent())) {
+            log.warn("Email already sent for invoice {}", invoice.getId());
+            return;
+        }
 
         try {
 
             String html = templateService.buildPremiumInvoiceEmail(invoice);
 
-            emailService.sendHtmlEmailWithAttachment(
-                    invoice.getEmail(),
-                    "🎉 Payment Successful - Vidhura Tech",
-                    html,
-                    invoicePdf.getBytes(),
-                    "Invoice_" + invoice.getId() + ".pdf"
-            );
+            if (invoicePdf != null && !invoicePdf.isEmpty()) {
 
-            log.info("Mail sent to {}", invoice.getEmail());
+                emailService.sendHtmlEmailWithAttachment(
+                        invoice.getEmail(),
+                        "🎉 Payment Successful - Vidhura Tech",
+                        html,
+                        invoicePdf.getBytes(),
+                        "Invoice_" + invoice.getId() + ".pdf"
+                );
+
+            } else {
+
+                emailService.sendHtmlEmail(
+                        invoice.getEmail(),
+                        "🎉 Payment Successful - Vidhura Tech",
+                        html
+                );
+            }
+
+            // ✅ MARK AS SENT
+            invoice.setEmailSent(true);
+            invoiceRepo.save(invoice);
+
+            log.info("Email sent successfully for {}", invoice.getId());
 
         } catch (Exception e) {
             log.error("Email failed", e);
@@ -375,9 +380,6 @@ public class CheckoutService {
         invoice.setVerifiedAt(LocalDateTime.now());
 
         invoiceRepo.save(invoice);
-
-        // ✅ SEND EMAIL WITH FRONTEND PDF
-        sendSuccessEmail(invoice, invoicePdf);
     }
 
     public boolean verifyPaymentSignature(String orderId, String paymentId, String signature) {

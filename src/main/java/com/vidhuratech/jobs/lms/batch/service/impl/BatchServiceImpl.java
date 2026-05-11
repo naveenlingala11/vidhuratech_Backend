@@ -218,4 +218,36 @@ public class BatchServiceImpl implements BatchService {
                 )
                 .orElse(null);
     }
+
+    @Override
+    public List<?> getAllBatchesLite() {
+
+        return batchRepository.findAll()
+                .stream()
+                .map(batch -> Map.of(
+
+                        "id", batch.getId(),
+
+                        "name",
+                        batch.getName() != null
+                                ? batch.getName()
+                                : "",
+
+                        "courseName",
+                        batch.getCourse() != null
+                                ? batch.getCourse().getTitle()
+                                : "",
+
+                        "trainerName",
+                        batch.getTrainer() != null
+                                ? batch.getTrainer().getName()
+                                : "",
+
+                        "status",
+                        batch.getStatus() != null
+                                ? batch.getStatus().name()
+                                : "UNKNOWN"
+                ))
+                .toList();
+    }
 }

@@ -177,4 +177,16 @@ public class BatchController {
                     .build();
         }
     }
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','HR','TRAINER')")
+    public ApiResponse<?> getAllBatchesLite() {
+
+        return ApiResponse.builder()
+                .success(true)
+                .data(
+                        batchService.getAllBatchesLite()
+                )
+                .build();
+    }
 }

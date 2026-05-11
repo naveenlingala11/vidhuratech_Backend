@@ -76,4 +76,7 @@ public class Invoice {
 
     @Column(name = "razorpay_signature")
     private String razorpaySignature;
+
+    @Column(name = "email_sent")
+    private Boolean emailSent = false;
 }
