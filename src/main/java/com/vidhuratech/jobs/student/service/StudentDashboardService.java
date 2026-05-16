@@ -7,6 +7,7 @@ import com.vidhuratech.jobs.student.dto.StudentDashboardResponseDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 
@@ -16,11 +17,7 @@ public class StudentDashboardService {
 
     private final BatchEnrollmentRepository enrollmentRepository;
 
-    /* =========================
-       🔹 PUBLIC METHODS
-    ========================= */
-
-    // ✅ Dashboard API
+    @Transactional(readOnly = true)
     public StudentDashboardResponseDTO getDashboard() {
 
         String email = getCurrentUserEmail();
@@ -40,7 +37,7 @@ public class StudentDashboardService {
                 .build();
     }
 
-    // ✅ Courses API (used separately also)
+    @Transactional(readOnly = true)
     public List<StudentCourseDTO> getMyCourses() {
 
         String email = getCurrentUserEmail();
@@ -53,37 +50,33 @@ public class StudentDashboardService {
                 .toList();
     }
 
-    // ✅ Assignments (future ready)
-    public List<?> getAssignments() {
-        return List.of(); // TODO: integrate assignments module
-    }
+    private StudentCourseDTO mapToCourseDTO(BatchEnrollment enrollment) {
 
-    // ✅ Certificates (future ready)
-    public List<?> getCertificates() {
-        return List.of(); // TODO: integrate certificates module
-    }
+        if (enrollment.getBatch() == null ||
+                enrollment.getBatch().getCourse() == null) {
 
-    /* =========================
-       🔹 PRIVATE HELPERS
-    ========================= */
+            return StudentCourseDTO.builder()
+                    .courseId(null)
+                    .courseName("Course")
+                    .batchId(null)
+                    .batchName("Batch")
+                    .progress(0)
+                    .build();
+        }
+
+        return StudentCourseDTO.builder()
+                .courseId(enrollment.getBatch().getCourse().getId())
+                .courseName(enrollment.getBatch().getCourse().getTitle())
+                .batchId(enrollment.getBatch().getId())
+                .batchName(enrollment.getBatch().getName())
+                .progress(0)
+                .build();
+    }
 
     private String getCurrentUserEmail() {
         return SecurityContextHolder.getContext()
                 .getAuthentication()
                 .getName();
-    }
-
-    private StudentCourseDTO mapToCourseDTO(BatchEnrollment enrollment) {
-
-        return StudentCourseDTO.builder()
-                .courseId(enrollment.getBatch().getCourse().getId())
-                .courseName(enrollment.getBatch().getCourse().getTitle())
-
-                .batchId(enrollment.getBatch().getId())
-                .batchName(enrollment.getBatch().getName())
-
-                .progress(0)
-                .build();
     }
 
     private Map<String, Object> buildStats(long enrolledCourses) {

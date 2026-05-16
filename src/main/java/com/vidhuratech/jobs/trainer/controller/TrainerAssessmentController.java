@@ -27,6 +27,18 @@ public class TrainerAssessmentController {
                 .build();
     }
 
+    @PostMapping("/bulk")
+    public ApiResponse<?> bulkUploadAssessments(
+            @RequestBody Map<String, Object> payload
+    ) {
+
+        return ApiResponse.builder()
+                .success(true)
+                .message("Bulk assessment uploaded successfully")
+                .data(service.createAssessment(payload))
+                .build();
+    }
+
     @GetMapping
     public ApiResponse<?> getTrainerAssessments() {
 
