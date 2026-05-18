@@ -280,4 +280,38 @@ public class BatchServiceImpl implements BatchService {
                 })
                 .toList();
     }
+
+    @Override
+    public BatchSessionResponseDTO updateSession(
+            Long batchId,
+            Long sessionId,
+            BatchSessionRequestDTO dto
+    ) {
+
+        BatchSession session =
+                getSession(batchId, sessionId);
+
+        session.setTitle(dto.getTitle());
+        session.setDescription(dto.getDescription());
+        session.setVideoUrl(dto.getVideoUrl());
+        session.setDurationMinutes(dto.getDurationMinutes());
+        session.setSessionDate(dto.getSessionDate());
+
+        if (dto.getPublished() != null) {
+            session.setPublished(dto.getPublished());
+        }
+
+        BatchSession updated =
+                sessionRepository.save(session);
+
+        return BatchSessionResponseDTO.builder()
+                .id(updated.getId())
+                .title(updated.getTitle())
+                .description(updated.getDescription())
+                .videoUrl(updated.getVideoUrl())
+                .durationMinutes(updated.getDurationMinutes())
+                .sessionDate(updated.getSessionDate())
+                .published(updated.getPublished())
+                .build();
+    }
 }

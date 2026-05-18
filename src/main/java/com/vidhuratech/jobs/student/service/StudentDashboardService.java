@@ -4,11 +4,13 @@ import com.vidhuratech.jobs.lms.batch.entity.BatchEnrollment;
 import com.vidhuratech.jobs.lms.batch.repository.BatchEnrollmentRepository;
 import com.vidhuratech.jobs.student.dto.StudentCourseDTO;
 import com.vidhuratech.jobs.student.dto.StudentDashboardResponseDTO;
+import com.vidhuratech.jobs.trainer.repository.AssessmentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.*;
 
 @Service
@@ -16,6 +18,7 @@ import java.util.*;
 public class StudentDashboardService {
 
     private final BatchEnrollmentRepository enrollmentRepository;
+    private final AssessmentRepository assessmentRepository;
 
     @Transactional(readOnly = true)
     public StudentDashboardResponseDTO getDashboard() {
@@ -79,20 +82,72 @@ public class StudentDashboardService {
                 .getName();
     }
 
-    private Map<String, Object> buildStats(long enrolledCourses) {
+    private Map<String, Object> buildStats(
+            long enrolledCourses
+    ) {
 
-        Map<String, Object> stats = new HashMap<>();
+        String email =
+                getCurrentUserEmail();
 
-        stats.put("enrolledCourses", enrolledCourses);
-        stats.put("attendance", 0);
-        stats.put("assignmentsPending", 0);
-        stats.put("assessmentsUpcoming", 0);
-        stats.put("certificates", 0);
-        stats.put("placementStatus", "Not Eligible");
+        List<Long> batchIds =
+                enrollmentRepository
+                        .findActiveByStudentEmail(email)
+                        .stream()
+                        .map(enrollment ->
+                                enrollment
+                                        .getBatch()
+                                        .getId()
+                        )
+                        .toList();
+
+        long assessmentsUpcoming = 0;
+
+        if (!batchIds.isEmpty()) {
+
+            assessmentsUpcoming =
+                    assessmentRepository
+                            .findActiveAssessmentsForStudent(
+                                    batchIds,
+                                    LocalDateTime.now()
+                            )
+                            .size();
+        }
+
+        Map<String, Object> stats =
+                new HashMap<>();
+
+        stats.put(
+                "enrolledCourses",
+                enrolledCourses
+        );
+
+        stats.put(
+                "attendance",
+                0
+        );
+
+        stats.put(
+                "assignmentsPending",
+                0
+        );
+
+        stats.put(
+                "assessmentsUpcoming",
+                assessmentsUpcoming
+        );
+
+        stats.put(
+                "certificates",
+                0
+        );
+
+        stats.put(
+                "placementStatus",
+                "Not Eligible"
+        );
 
         return stats;
     }
-
     private Map<String, List<?>> buildSections(List<StudentCourseDTO> myCourses) {
 
         Map<String, List<?>> sections = new HashMap<>();

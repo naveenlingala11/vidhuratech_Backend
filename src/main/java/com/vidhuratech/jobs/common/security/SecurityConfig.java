@@ -80,7 +80,7 @@ public class SecurityConfig {
                                 "STUDENT"
                         )
                         .requestMatchers("/api/lms/admin/**").hasAnyRole("ADMIN","SUPER_ADMIN","HR")
-
+                        .requestMatchers(HttpMethod.GET, "/certificates/*/download").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(
