@@ -20,40 +20,67 @@ public class AuthService {
     private final JwtUtil jwtUtil;
 
     public AuthResponse register(RegisterRequest request) {
+
         if (userRepo.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already exists");
+            throw new RuntimeException("EMAIL_ALREADY_EXISTS");
         }
 
         User user = new User();
+
         user.setName(request.getName());
         user.setEmail(request.getEmail());
         user.setPhone(request.getPhone());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setPassword(
+                passwordEncoder.encode(request.getPassword())
+        );
+
         user.setRole(UserRole.STUDENT);
         user.setActive(true);
         user.setFirstLogin(false);
 
         userRepo.save(user);
 
-        return buildAuthResponse(user, jwtUtil.generateToken(user));
+        return buildAuthResponse(
+                user,
+                jwtUtil.generateToken(user)
+        );
     }
 
     public AuthResponse login(LoginRequest req) {
-        User user = userRepo.findByEmail(req.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
 
-        if (!passwordEncoder.matches(req.getPassword(), user.getPassword())) {
-            throw new RuntimeException("Invalid credentials");
+        User user = userRepo.findByEmail(req.getEmail())
+                .orElseThrow(() ->
+                        new RuntimeException("USER_NOT_FOUND")
+                );
+
+        if (!passwordEncoder.matches(
+                req.getPassword(),
+                user.getPassword()
+        )) {
+
+            throw new RuntimeException(
+                    "INVALID_CREDENTIALS"
+            );
         }
 
         if (Boolean.FALSE.equals(user.getActive())) {
-            throw new RuntimeException("Account is inactive");
+
+            throw new RuntimeException(
+                    "ACCOUNT_INACTIVE"
+            );
         }
 
-        return buildAuthResponse(user, jwtUtil.generateToken(user));
+        return buildAuthResponse(
+                user,
+                jwtUtil.generateToken(user)
+        );
     }
 
-    private AuthResponse buildAuthResponse(User user, String token) {
+    private AuthResponse buildAuthResponse(
+            User user,
+            String token
+    ) {
+
         return AuthResponse.builder()
                 .token(token)
                 .id(user.getId())
@@ -62,7 +89,11 @@ public class AuthService {
                 .phone(user.getPhone())
                 .role(user.getRole())
                 .active(user.getActive())
-                .firstLogin(Boolean.TRUE.equals(user.getFirstLogin()))
+                .firstLogin(
+                        Boolean.TRUE.equals(
+                                user.getFirstLogin()
+                        )
+                )
                 .build();
     }
 }

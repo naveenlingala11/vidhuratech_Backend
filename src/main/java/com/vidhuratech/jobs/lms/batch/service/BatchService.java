@@ -28,4 +28,10 @@ public interface BatchService {
     Batch getActiveBatchByCourse(Long courseId);
 
     List<?> getAllBatchesLite();
+
+    BatchSessionResponseDTO updateSession(
+            Long batchId,
+            Long sessionId,
+            BatchSessionRequestDTO dto
+    );
 }

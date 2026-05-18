@@ -17,4 +17,10 @@ public interface AssessmentAttemptRepository
             Long assessmentId,
             Long studentId
     );
+    List<AssessmentAttempt>
+    findByAssessmentIdAndStudentIdOrderByIdDesc(
+            Long assessmentId,
+            Long studentId
+    );
+
 }

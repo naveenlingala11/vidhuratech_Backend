@@ -1,6 +1,7 @@
 package com.vidhuratech.jobs.student.service;
 
 import com.vidhuratech.jobs.common.security.SecurityUtils;
+import com.vidhuratech.jobs.lms.batch.entity.BatchEnrollment;
 import com.vidhuratech.jobs.lms.batch.repository.BatchEnrollmentRepository;
 import com.vidhuratech.jobs.trainer.entity.Assessment;
 import com.vidhuratech.jobs.trainer.entity.AssessmentAnswer;
@@ -14,272 +15,406 @@ import com.vidhuratech.jobs.user.entity.User;
 import com.vidhuratech.jobs.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
 public class StudentAssessmentService {
 
     private final AssessmentRepository assessmentRepository;
-    private final AssessmentQuestionRepository questionRepository;
+
     private final AssessmentAttemptRepository attemptRepository;
+
     private final AssessmentAnswerRepository answerRepository;
-    private final BatchEnrollmentRepository enrollmentRepository;
+
+    private final AssessmentQuestionRepository questionRepository;
+
     private final UserRepository userRepository;
+
+    private final BatchEnrollmentRepository
+            batchEnrollmentRepository;
+
     private final SecurityUtils securityUtils;
 
     public List<Map<String, Object>> getStudentAssessments() {
 
-        User student = getCurrentStudent();
+        User student =
+                userRepository.findByEmail(
+                        securityUtils.getCurrentUserEmail()
+                ).orElseThrow(() ->
+                        new RuntimeException(
+                                "Student not found"
+                        ));
 
-        List<Long> batchIds = enrollmentRepository
-                .findActiveByStudentEmail(student.getEmail())
-                .stream()
-                .map(enrollment -> enrollment.getBatch().getId())
-                .toList();
+        List<BatchEnrollment> enrollments =
+                batchEnrollmentRepository
+                        .findActiveByStudentEmail(
+                                student.getEmail()
+                        );
+
+        List<Long> batchIds =
+                enrollments.stream()
+                        .map(enrollment ->
+                                enrollment
+                                        .getBatch()
+                                        .getId()
+                        )
+                        .toList();
 
         if (batchIds.isEmpty()) {
-            return List.of();
+
+            return new ArrayList<>();
         }
 
-        List<Assessment> assessments = assessmentRepository
+        return assessmentRepository
                 .findActiveAssessmentsForStudent(
                         batchIds,
                         LocalDateTime.now()
-                );
-
-        return assessments.stream()
-                .map(assessment -> buildAssessmentCard(
-                        assessment,
-                        student.getId()
-                ))
+                )
+                .stream()
+                .map(this::mapAssessment)
                 .toList();
     }
+    public Map<String, Object> getAssessment(Long id) {
 
-    public Assessment getAssessmentById(Long assessmentId) {
+        Assessment assessment =
+                assessmentRepository
+                        .findDetailedAssessment(id)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Assessment not found"
+                                ));
 
-        Assessment assessment = assessmentRepository
-                .findById(assessmentId)
-                .orElseThrow(() ->
-                        new RuntimeException("Assessment not found"));
+        Map<String, Object> map =
+                new HashMap<>();
 
-        validateAssessmentAvailability(assessment);
+        map.put(
+                "id",
+                assessment.getId()
+        );
 
-        return assessment;
+        map.put(
+                "title",
+                assessment.getTitle()
+        );
+
+        map.put(
+                "description",
+                assessment.getDescription()
+        );
+
+        map.put(
+                "durationMinutes",
+                assessment.getDurationMinutes()
+        );
+
+        map.put(
+                "totalMarks",
+                assessment.getTotalMarks()
+        );
+
+        map.put(
+                "questions",
+                assessment.getQuestions()
+                        .stream()
+                        .map(q -> {
+
+                            Map<String, Object> qm =
+                                    new HashMap<>();
+
+                            qm.put(
+                                    "id",
+                                    q.getId()
+                            );
+
+                            qm.put(
+                                    "question",
+                                    q.getQuestion()
+                            );
+
+                            qm.put(
+                                    "marks",
+                                    q.getMarks()
+                            );
+
+                            qm.put(
+                                    "correctAnswer",
+                                    q.getCorrectAnswer()
+                            );
+
+                            qm.put(
+                                    "options",
+                                    Map.of(
+                                            "A",
+                                            q.getOptionA(),
+                                            "B",
+                                            q.getOptionB(),
+                                            "C",
+                                            q.getOptionC(),
+                                            "D",
+                                            q.getOptionD()
+                                    )
+                            );
+
+                            return qm;
+                        })
+                        .toList()
+        );
+
+        return map;
     }
 
+    @Transactional
     public Map<String, Object> submitAssessment(
             Long assessmentId,
             Map<String, Object> payload
     ) {
 
-        User student = getCurrentStudent();
+        User student =
+                userRepository.findByEmail(
+                        securityUtils.getCurrentUserEmail()
+                ).orElseThrow(() ->
+                        new RuntimeException(
+                                "Student not found"
+                        ));
 
-        Assessment assessment = assessmentRepository
-                .findById(assessmentId)
-                .orElseThrow(() ->
-                        new RuntimeException("Assessment not found"));
+        Assessment assessment =
+                assessmentRepository.findById(
+                        assessmentId
+                ).orElseThrow(() ->
+                        new RuntimeException(
+                                "Assessment not found"
+                        ));
 
-        validateAssessmentAvailability(assessment);
-
-        boolean alreadySubmitted = attemptRepository
-                .findByAssessmentIdAndStudentId(
-                        assessmentId,
-                        student.getId()
-                )
-                .isPresent();
-
-        if (alreadySubmitted) {
-            throw new RuntimeException("Assessment already submitted");
-        }
-
-        Object rawAnswers = payload.get("answers");
+        Object rawAnswers =
+                payload.get("answers");
 
         if (!(rawAnswers instanceof List<?> rawList)) {
-            throw new RuntimeException("Invalid answers payload");
+
+            throw new RuntimeException(
+                    "Invalid answers payload"
+            );
         }
 
         int totalScore = 0;
+
         int correctAnswers = 0;
 
-        AssessmentAttempt attempt = AssessmentAttempt.builder()
-                .assessment(assessment)
-                .student(student)
-                .submittedAt(LocalDateTime.now())
-                .build();
+        AssessmentAttempt attempt =
+                AssessmentAttempt.builder()
+                        .assessment(assessment)
+                        .student(student)
+                        .score(0)
+                        .correctAnswers(0)
+                        .totalQuestions(
+                                assessment
+                                        .getQuestions()
+                                        .size()
+                        )
+                        .submittedAt(
+                                LocalDateTime.now()
+                        )
+                        .build();
 
-        attempt = attemptRepository.save(attempt);
+        attempt =
+                attemptRepository.save(attempt);
 
         for (Object obj : rawList) {
 
-            if (!(obj instanceof Map<?, ?> rawMap)) {
-                throw new RuntimeException("Invalid answer format");
+            if (!(obj instanceof Map<?, ?> ans)) {
+                continue;
             }
 
-            Long questionId = Long.valueOf(
-                    String.valueOf(rawMap.get("questionId"))
-            );
+            Long questionId =
+                    Long.valueOf(
+                            String.valueOf(
+                                    ans.get("questionId")
+                            )
+                    );
 
-            String selectedAnswer = String.valueOf(
-                    rawMap.get("selectedAnswer")
-            ).toUpperCase();
+            String selectedAnswer =
+                    String.valueOf(
+                            ans.get("selectedAnswer")
+                    );
 
-            validateAnswerOption(selectedAnswer);
+            AssessmentQuestion question =
+                    questionRepository
+                            .findById(questionId)
+                            .orElseThrow(() ->
+                                    new RuntimeException(
+                                            "Question not found"
+                                    ));
 
-            AssessmentQuestion question = questionRepository
-                    .findById(questionId)
-                    .orElseThrow(() ->
-                            new RuntimeException("Question not found"));
-
-            validateQuestionOwnership(
-                    question,
-                    assessmentId
-            );
-
-            boolean correct = question.getCorrectAnswer()
-                    .equalsIgnoreCase(selectedAnswer);
+            boolean correct =
+                    question.getCorrectAnswer()
+                            .equalsIgnoreCase(
+                                    selectedAnswer
+                            );
 
             if (correct) {
-                totalScore += question.getMarks();
+
+                totalScore +=
+                        question.getMarks();
+
                 correctAnswers++;
             }
 
-            AssessmentAnswer assessmentAnswer = AssessmentAnswer.builder()
-                    .attempt(attempt)
-                    .question(question)
-                    .selectedAnswer(selectedAnswer)
-                    .correct(correct)
-                    .build();
+            AssessmentAnswer answer =
+                    AssessmentAnswer.builder()
+                            .attempt(attempt)
+                            .question(question)
+                            .selectedAnswer(
+                                    selectedAnswer
+                            )
+                            .correct(correct)
+                            .build();
 
-            answerRepository.save(assessmentAnswer);
+            answerRepository.save(answer);
         }
 
-        int totalQuestions = rawList.size();
-
-        int percentage = assessment.getTotalMarks() == 0
-                ? 0
-                : (totalScore * 100) / assessment.getTotalMarks();
-
-        int wrongAnswers = totalQuestions - correctAnswers;
-
         attempt.setScore(totalScore);
-        attempt.setCorrectAnswers(correctAnswers);
-        attempt.setTotalQuestions(totalQuestions);
+
+        attempt.setCorrectAnswers(
+                correctAnswers
+        );
 
         attemptRepository.save(attempt);
 
-        Map<String, Object> result = new HashMap<>();
+        Map<String, Object> response =
+                new HashMap<>();
 
-        result.put("score", totalScore);
-        result.put("totalMarks", assessment.getTotalMarks());
-        result.put("percentage", percentage);
-        result.put("correctAnswers", correctAnswers);
-        result.put("wrongAnswers", wrongAnswers);
-        result.put("totalQuestions", totalQuestions);
-        result.put("passed", percentage >= 40);
-        result.put("submittedAt", attempt.getSubmittedAt());
+        response.put(
+                "assessmentId",
+                assessment.getId()
+        );
 
-        return result;
+        response.put(
+                "score",
+                totalScore
+        );
+
+        response.put(
+                "correctAnswers",
+                correctAnswers
+        );
+
+        response.put(
+                "totalQuestions",
+                assessment.getQuestions().size()
+        );
+
+        response.put(
+                "percentage",
+                (
+                        totalScore * 100
+                ) / assessment.getTotalMarks()
+        );
+
+        response.put(
+                "submittedAt",
+                attempt.getSubmittedAt()
+        );
+
+        return response;
     }
 
-    // =========================
-    // PRIVATE HELPERS
-    // =========================
-
-    private User getCurrentStudent() {
-
-        String email = securityUtils.getCurrentUserEmail();
-
-        return userRepository.findByEmail(email)
-                .orElseThrow(() ->
-                        new RuntimeException("Student not found"));
-    }
-
-    private void validateAssessmentAvailability(
+    private Map<String, Object> mapAssessment(
             Assessment assessment
     ) {
 
-        if (Boolean.FALSE.equals(assessment.getActive())) {
-            throw new RuntimeException("Assessment inactive");
-        }
+        User student =
+                userRepository.findByEmail(
+                        securityUtils.getCurrentUserEmail()
+                ).orElseThrow();
 
-        LocalDateTime now = LocalDateTime.now();
+        List<AssessmentAttempt> attempts =
+                attemptRepository
+                        .findByAssessmentIdAndStudentIdOrderByIdDesc(
+                                assessment.getId(),
+                                student.getId()
+                        );
 
-        if (assessment.getStartTime() != null &&
-                now.isBefore(assessment.getStartTime())) {
+        AssessmentAttempt latestAttempt =
+                attempts.isEmpty()
+                        ? null
+                        : attempts.get(0);
 
-            throw new RuntimeException(
-                    "Assessment not started yet"
-            );
-        }
+        Map<String, Object> map =
+                new HashMap<>();
 
-        if (assessment.getEndTime() != null &&
-                now.isAfter(assessment.getEndTime())) {
-
-            throw new RuntimeException(
-                    "Assessment expired"
-            );
-        }
-    }
-
-    private void validateAnswerOption(
-            String selectedAnswer
-    ) {
-
-        if (!List.of("A", "B", "C", "D")
-                .contains(selectedAnswer)) {
-
-            throw new RuntimeException(
-                    "Invalid answer option"
-            );
-        }
-    }
-
-    private void validateQuestionOwnership(
-            AssessmentQuestion question,
-            Long assessmentId
-    ) {
-
-        if (!question.getAssessment()
-                .getId()
-                .equals(assessmentId)) {
-
-            throw new RuntimeException(
-                    "Question mismatch detected"
-            );
-        }
-    }
-
-    private Map<String, Object> buildAssessmentCard(
-            Assessment assessment,
-            Long studentId
-    ) {
-
-        AssessmentAttempt attempt = attemptRepository
-                .findByAssessmentIdAndStudentId(
-                        assessment.getId(),
-                        studentId
-                )
-                .orElse(null);
-
-        Map<String, Object> map = new HashMap<>();
-
-        map.put("id", assessment.getId());
-        map.put("title", assessment.getTitle());
-        map.put("description", assessment.getDescription());
-        map.put("batch", assessment.getBatch().getName());
-        map.put("durationMinutes", assessment.getDurationMinutes());
-        map.put("totalMarks", assessment.getTotalMarks());
-        map.put("questionCount", assessment.getQuestions().size());
-        map.put("attempted", attempt != null);
-        map.put("score", attempt != null ? attempt.getScore() : 0);
         map.put(
-                "submittedAt",
-                attempt != null ? attempt.getSubmittedAt() : ""
+                "id",
+                assessment.getId()
+        );
+
+        map.put(
+                "title",
+                assessment.getTitle()
+        );
+
+        map.put(
+                "description",
+                assessment.getDescription()
+        );
+
+        map.put(
+                "totalMarks",
+                assessment.getTotalMarks()
+        );
+
+        map.put(
+                "durationMinutes",
+                assessment.getDurationMinutes()
+        );
+
+        map.put(
+                "questionCount",
+                assessment.getQuestions().size()
+        );
+
+        map.put(
+                "attemptCount",
+                attempts.size()
+        );
+
+        map.put(
+                "lastScore",
+                latestAttempt == null
+                        ? 0
+                        : latestAttempt.getScore()
+        );
+
+        double percentage =
+                latestAttempt == null
+                        ? 0
+                        : (
+                        (
+                        double)
+                                latestAttempt.getScore()
+                        /
+                                assessment.getTotalMarks()
+                ) * 100;
+
+        map.put(
+                "percentage",
+                Math.round(percentage)
+        );
+
+        map.put(
+                "status",
+                percentage >= 40
+                        ? "PASS"
+                        : "FAIL"
+        );
+
+        map.put(
+                "lastSubmittedAt",
+                latestAttempt == null
+                        ? null
+                        : latestAttempt.getSubmittedAt()
         );
 
         return map;

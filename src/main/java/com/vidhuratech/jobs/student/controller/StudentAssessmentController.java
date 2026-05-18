@@ -24,27 +24,32 @@ public class StudentAssessmentController {
                 .build();
     }
 
-    @GetMapping("/{assessmentId}")
+    @GetMapping("/{id}")
     public ApiResponse<?> getAssessment(
-            @PathVariable Long assessmentId
+            @PathVariable Long id
     ) {
 
         return ApiResponse.builder()
                 .success(true)
-                .data(service.getAssessmentById(assessmentId))
+                .data(service.getAssessment(id))
                 .build();
     }
 
-    @PostMapping("/{assessmentId}/submit")
+    @PostMapping("/{id}/submit")
     public ApiResponse<?> submitAssessment(
-            @PathVariable Long assessmentId,
+            @PathVariable Long id,
             @RequestBody Map<String, Object> payload
     ) {
 
         return ApiResponse.builder()
                 .success(true)
-                .message("Assessment submitted")
-                .data(service.submitAssessment(assessmentId, payload))
+                .message("Assessment submitted successfully")
+                .data(
+                        service.submitAssessment(
+                                id,
+                                payload
+                        )
+                )
                 .build();
     }
 }

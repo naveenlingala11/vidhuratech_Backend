@@ -202,4 +202,25 @@ public class BatchController {
                     .build();
         }
     }
+
+    @PutMapping("/{batchId}/sessions/{sessionId}")
+    @PreAuthorize("hasRole('TRAINER')")
+    public ApiResponse<?> updateSession(
+            @PathVariable Long batchId,
+            @PathVariable Long sessionId,
+            @RequestBody BatchSessionRequestDTO dto
+    ) {
+
+        return ApiResponse.builder()
+                .success(true)
+                .message("Session updated successfully")
+                .data(
+                        batchService.updateSession(
+                                batchId,
+                                sessionId,
+                                dto
+                        )
+                )
+                .build();
+    }
 }

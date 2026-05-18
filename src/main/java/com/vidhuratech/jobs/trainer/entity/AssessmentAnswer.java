@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
+@Table(name = "assessment_answers")
 @Getter
 @Setter
 @Builder
@@ -15,12 +16,21 @@ public class AssessmentAnswer {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "attempt_id",
+            nullable = false
+    )
     private AssessmentAttempt attempt;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "question_id",
+            nullable = false
+    )
     private AssessmentQuestion question;
 
+    @Column(nullable = false)
     private String selectedAnswer;
 
     private Boolean correct;
