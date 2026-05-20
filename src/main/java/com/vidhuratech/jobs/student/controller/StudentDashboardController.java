@@ -47,4 +47,13 @@ public class StudentDashboardController {
                 .data(List.of())
                 .build();
     }
+
+    @GetMapping("/learning-content")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ApiResponse<?> getLearningContent() {
+        return ApiResponse.builder()
+                .success(true)
+                .data(service.getLearningContent())
+                .build();
+    }
 }

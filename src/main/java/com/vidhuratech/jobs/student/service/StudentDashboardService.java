@@ -4,7 +4,10 @@ import com.vidhuratech.jobs.lms.batch.entity.BatchEnrollment;
 import com.vidhuratech.jobs.lms.batch.repository.BatchEnrollmentRepository;
 import com.vidhuratech.jobs.student.dto.StudentCourseDTO;
 import com.vidhuratech.jobs.student.dto.StudentDashboardResponseDTO;
+import com.vidhuratech.jobs.trainer.dto.TrainingContentDTO;
+import com.vidhuratech.jobs.trainer.entity.TrainingContent;
 import com.vidhuratech.jobs.trainer.repository.AssessmentRepository;
+import com.vidhuratech.jobs.trainer.repository.TrainingContentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -19,6 +22,7 @@ public class StudentDashboardService {
 
     private final BatchEnrollmentRepository enrollmentRepository;
     private final AssessmentRepository assessmentRepository;
+    private final TrainingContentRepository contentRepository;
 
     @Transactional(readOnly = true)
     public StudentDashboardResponseDTO getDashboard() {
@@ -93,11 +97,8 @@ public class StudentDashboardService {
                 enrollmentRepository
                         .findActiveByStudentEmail(email)
                         .stream()
-                        .map(enrollment ->
-                                enrollment
-                                        .getBatch()
-                                        .getId()
-                        )
+                        .filter(enrollment -> enrollment.getBatch() != null && enrollment.getBatch().getId() != null)
+                        .map(enrollment -> enrollment.getBatch().getId())
                         .toList();
 
         long assessmentsUpcoming = 0;
@@ -113,6 +114,18 @@ public class StudentDashboardService {
                             .size();
         }
 
+        long practiceItems = 0;
+        long materials = 0;
+        long notes = 0;
+
+        if (!batchIds.isEmpty()) {
+            List<TrainingContent> content = contentRepository.findByBatchIdInOrderByCreatedAtDesc(batchIds);
+
+            practiceItems = content.stream().filter(item -> item.getType().name().equals("PRACTICE")).count();
+            materials = content.stream().filter(item -> item.getType().name().equals("MATERIAL")).count();
+            notes = content.stream().filter(item -> item.getType().name().equals("NOTE")).count();
+        }
+
         Map<String, Object> stats =
                 new HashMap<>();
 
@@ -126,10 +139,10 @@ public class StudentDashboardService {
                 0
         );
 
-        stats.put(
-                "assignmentsPending",
-                0
-        );
+        stats.put("assignmentsPending", 0);
+        stats.put("practiceItems", practiceItems);
+        stats.put("materials", materials);
+        stats.put("notes", notes);
 
         stats.put(
                 "assessmentsUpcoming",
@@ -149,13 +162,50 @@ public class StudentDashboardService {
         return stats;
     }
     private Map<String, List<?>> buildSections(List<StudentCourseDTO> myCourses) {
-
         Map<String, List<?>> sections = new HashMap<>();
 
         sections.put("myCourses", myCourses);
         sections.put("notifications", List.of());
         sections.put("mentorSessions", List.of());
+        String email = getCurrentUserEmail();
+
+        List<Long> batchIds = enrollmentRepository
+                .findActiveByStudentEmail(email)
+                .stream()
+                .filter(enrollment -> enrollment.getBatch() != null && enrollment.getBatch().getId() != null)
+                .map(enrollment -> enrollment.getBatch().getId())
+                .toList();
+
+        sections.put("learningContent",
+                batchIds.isEmpty()
+                        ? List.of()
+                        : contentRepository.findByBatchIdInOrderByCreatedAtDesc(batchIds)
+                        .stream()
+                        .map(TrainingContentDTO::from)
+                        .toList()
+        );
 
         return sections;
+    }
+
+    @Transactional(readOnly = true)
+    public List<TrainingContentDTO> getLearningContent() {
+        String email = getCurrentUserEmail();
+
+        List<Long> batchIds = enrollmentRepository
+                .findActiveByStudentEmail(email)
+                .stream()
+                .filter(enrollment -> enrollment.getBatch() != null && enrollment.getBatch().getId() != null)
+                .map(enrollment -> enrollment.getBatch().getId())
+                .toList();
+
+        if (batchIds.isEmpty()) {
+            return List.of();
+        }
+
+        return contentRepository.findByBatchIdInOrderByCreatedAtDesc(batchIds)
+                .stream()
+                .map(TrainingContentDTO::from)
+                .toList();
     }
 }

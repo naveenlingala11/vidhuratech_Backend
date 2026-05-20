@@ -48,6 +48,7 @@ public class TrainerWorkflowService {
 
     public Map<String, Object> updateMockInterview(Long id, Map<String, Object> payload) {
         String email = securityUtils.getCurrentUserEmail();
+
         MockInterviewRequest request = mockRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Mock interview request not found"));
 
@@ -55,17 +56,27 @@ public class TrainerWorkflowService {
             throw new RuntimeException("Access denied");
         }
 
-        if (payload.get("status") != null) {
-            request.setStatus(MockInterviewStatus.valueOf(payload.get("status").toString()));
-        }
-        if (payload.get("meetingLink") != null) {
-            request.setMeetingLink(payload.get("meetingLink").toString());
-        }
-        if (payload.get("trainerRemarks") != null) {
-            request.setTrainerRemarks(payload.get("trainerRemarks").toString());
+        String statusValue = payload.getOrDefault("status", request.getStatus()).toString();
+
+        MockInterviewStatus status;
+        try {
+            status = MockInterviewStatus.valueOf(statusValue);
+        } catch (Exception e) {
+            throw new RuntimeException("Invalid mock interview status");
         }
 
+        String meetingLink = payload.getOrDefault("meetingLink", "").toString().trim();
+        String remarks = payload.getOrDefault("trainerRemarks", "").toString().trim();
+
+        if (status == MockInterviewStatus.SCHEDULED && meetingLink.isBlank()) {
+            throw new RuntimeException("Meeting link is required to schedule interview");
+        }
+
+        request.setStatus(status);
+        request.setMeetingLink(meetingLink);
+        request.setTrainerRemarks(remarks);
         request.setUpdatedAt(LocalDateTime.now());
+
         return mapMock(mockRepository.save(request));
     }
 
@@ -136,23 +147,26 @@ public class TrainerWorkflowService {
     }
 
     private Map<String, Object> mapMock(MockInterviewRequest request) {
-
         Map<String, Object> map = new HashMap<>();
 
         map.put("id", request.getId());
-        map.put("student", request.getStudent().getName());
-        map.put("email", request.getStudent().getEmail());
-        map.put("batch", request.getBatch().getName());
-        map.put("topic", request.getTopic());
-        map.put("preferredDate", request.getPreferredDate());
-        map.put("preferredTime", request.getPreferredTime());
+        map.put("student", request.getStudent() == null ? "Student" : request.getStudent().getName());
+        map.put("email", request.getStudent() == null ? "" : request.getStudent().getEmail());
+        map.put("batch", request.getBatch() == null ? "Batch" : request.getBatch().getName());
+        map.put("batchId", request.getBatch() == null ? null : request.getBatch().getId());
+        map.put("topic", request.getTopic() == null ? "Mock Interview" : request.getTopic());
+        map.put("preferredDate", request.getPreferredDate() == null ? "" : request.getPreferredDate());
+        map.put("preferredTime", request.getPreferredTime() == null ? "" : request.getPreferredTime());
         map.put("notes", request.getNotes() == null ? "" : request.getNotes());
         map.put("status", request.getStatus() == null ? MockInterviewStatus.REQUESTED : request.getStatus());
         map.put("meetingLink", request.getMeetingLink() == null ? "" : request.getMeetingLink());
         map.put("trainerRemarks", request.getTrainerRemarks() == null ? "" : request.getTrainerRemarks());
+        map.put("createdAt", request.getCreatedAt());
+        map.put("updatedAt", request.getUpdatedAt());
 
         return map;
     }
+
     private Map<String, Object> mapWorkItem(TrainingWorkItem item) {
         return Map.of(
                 "id", item.getId(),

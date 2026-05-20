@@ -36,4 +36,7 @@ public class AssessmentQuestion {
     private String correctAnswer;
 
     private Integer marks;
+
+    @Column(length = 3000)
+    private String explanation;
 }
