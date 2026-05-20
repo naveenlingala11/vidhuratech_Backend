@@ -16,10 +16,7 @@ public class TrainerAssessmentController {
     private final TrainerAssessmentService service;
 
     @PostMapping
-    public ApiResponse<?> createAssessment(
-            @RequestBody Map<String, Object> payload
-    ) {
-
+    public ApiResponse<?> createAssessment(@RequestBody Map<String, Object> payload) {
         return ApiResponse.builder()
                 .success(true)
                 .message("Assessment created successfully")
@@ -28,10 +25,7 @@ public class TrainerAssessmentController {
     }
 
     @PostMapping("/bulk")
-    public ApiResponse<?> bulkUploadAssessments(
-            @RequestBody Map<String, Object> payload
-    ) {
-
+    public ApiResponse<?> bulkUploadAssessments(@RequestBody Map<String, Object> payload) {
         return ApiResponse.builder()
                 .success(true)
                 .message("Bulk assessment uploaded successfully")
@@ -41,21 +35,46 @@ public class TrainerAssessmentController {
 
     @GetMapping
     public ApiResponse<?> getTrainerAssessments() {
-
         return ApiResponse.builder()
                 .success(true)
                 .data(service.getTrainerAssessments())
                 .build();
     }
 
-    @GetMapping("/{assessmentId}/attempts")
-    public ApiResponse<?> getAttempts(
-            @PathVariable Long assessmentId
-    ) {
+    @GetMapping("/{assessmentId}")
+    public ApiResponse<?> getAssessmentDetails(@PathVariable Long assessmentId) {
+        return ApiResponse.builder()
+                .success(true)
+                .data(service.getAssessmentDetails(assessmentId))
+                .build();
+    }
 
+    @GetMapping("/{assessmentId}/attempts")
+    public ApiResponse<?> getAttempts(@PathVariable Long assessmentId) {
         return ApiResponse.builder()
                 .success(true)
                 .data(service.getAssessmentAttempts(assessmentId))
+                .build();
+    }
+
+    @GetMapping("/{assessmentId}/attempts/{attemptId}")
+    public ApiResponse<?> getAttemptDetails(
+            @PathVariable Long assessmentId,
+            @PathVariable Long attemptId
+    ) {
+        return ApiResponse.builder()
+                .success(true)
+                .data(service.getAssessmentAttemptDetails(assessmentId, attemptId))
+                .build();
+    }
+
+    @DeleteMapping("/{assessmentId}")
+    public ApiResponse<?> deleteAssessment(@PathVariable Long assessmentId) {
+        service.deleteAssessment(assessmentId);
+
+        return ApiResponse.builder()
+                .success(true)
+                .message("Assessment deleted")
                 .build();
     }
 }

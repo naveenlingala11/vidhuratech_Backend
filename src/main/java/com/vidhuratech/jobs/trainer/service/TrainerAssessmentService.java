@@ -167,21 +167,141 @@ public class TrainerAssessmentService {
             );
         }
     }
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getTrainerAssessments() {
+        String email = securityUtils.getCurrentUserEmail();
 
-    public List<Assessment> getTrainerAssessments() {
-
-        String email =
-                securityUtils.getCurrentUserEmail();
-
-        return assessmentRepository
-                .findByTrainerEmail(email);
+        return assessmentRepository.findByTrainerEmail(email)
+                .stream()
+                .map(this::mapAssessmentListItem)
+                .toList();
     }
 
-    public List<AssessmentAttempt> getAssessmentAttempts(
-            Long assessmentId
-    ) {
+    @Transactional(readOnly = true)
+    public Map<String, Object> getAssessmentDetails(Long assessmentId) {
+        String email = securityUtils.getCurrentUserEmail();
 
-        return attemptRepository
-                .findByAssessmentId(assessmentId);
+        Assessment assessment = assessmentRepository.findDetailedAssessment(assessmentId)
+                .orElseThrow(() -> new RuntimeException("Assessment not found"));
+
+        if (assessment.getTrainer() == null || !email.equals(assessment.getTrainer().getEmail())) {
+            throw new RuntimeException("Access denied");
+        }
+
+        Map<String, Object> map = mapAssessmentListItem(assessment);
+
+        map.put("questions", assessment.getQuestions().stream().map(q -> {
+            Map<String, Object> question = new LinkedHashMap<>();
+            question.put("id", q.getId());
+            question.put("question", q.getQuestion());
+            question.put("options", Map.of(
+                    "A", q.getOptionA() == null ? "" : q.getOptionA(),
+                    "B", q.getOptionB() == null ? "" : q.getOptionB(),
+                    "C", q.getOptionC() == null ? "" : q.getOptionC(),
+                    "D", q.getOptionD() == null ? "" : q.getOptionD()
+            ));
+            question.put("correctAnswer", q.getCorrectAnswer());
+            question.put("marks", q.getMarks() == null ? 0 : q.getMarks());
+            question.put("explanation", q.getExplanation() == null ? "" : q.getExplanation());
+            return question;
+        }).toList());
+
+        return map;
+    }
+
+    private Map<String, Object> mapAssessmentListItem(Assessment assessment) {
+        Long attemptCount = attemptRepository.findByAssessmentId(assessment.getId())
+                .stream()
+                .count();
+
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("id", assessment.getId());
+        map.put("title", assessment.getTitle());
+        map.put("description", assessment.getDescription());
+        map.put("totalMarks", assessment.getTotalMarks() == null ? 0 : assessment.getTotalMarks());
+        map.put("durationMinutes", assessment.getDurationMinutes() == null ? 0 : assessment.getDurationMinutes());
+        map.put("active", Boolean.TRUE.equals(assessment.getActive()));
+        map.put("createdAt", assessment.getStartTime());
+
+        if (assessment.getBatch() != null) {
+            map.put("batchId", assessment.getBatch().getId());
+            map.put("batchName", assessment.getBatch().getName());
+            map.put(
+                    "courseName",
+                    assessment.getBatch().getCourse() == null
+                            ? ""
+                            : assessment.getBatch().getCourse().getTitle()
+            );
+        } else {
+            map.put("batchId", null);
+            map.put("batchName", "");
+            map.put("courseName", "");
+        }
+
+        map.put("questionCount", assessment.getQuestions() == null ? 0 : assessment.getQuestions().size());
+        map.put("attemptCount", attemptCount);
+
+        return map;
+    }
+
+    public List<Map<String, Object>> getAssessmentAttempts(Long assessmentId) {
+        return attemptRepository.findByAssessmentId(assessmentId)
+                .stream()
+                .map(attempt -> {
+                    Map<String, Object> map = new HashMap<>();
+
+                    int score = attempt.getScore() == null ? 0 : attempt.getScore();
+                    int totalQuestions = attempt.getTotalQuestions() == null ? 0 : attempt.getTotalQuestions();
+                    int totalMarks = attempt.getAssessment() == null || attempt.getAssessment().getTotalMarks() == null
+                            ? 0
+                            : attempt.getAssessment().getTotalMarks();
+                    int percentage = totalMarks == 0 ? 0 : Math.round((score * 100f) / totalMarks);
+
+                    map.put("id", attempt.getId());
+                    map.put("studentName", attempt.getStudent() == null ? "Student" : attempt.getStudent().getName());
+                    map.put("email", attempt.getStudent() == null ? "" : attempt.getStudent().getEmail());
+                    map.put("totalScore", score);
+                    map.put("totalMarks", totalMarks);
+                    map.put("percentageScore", percentage);
+                    map.put("correctAnswers", attempt.getCorrectAnswers() == null ? 0 : attempt.getCorrectAnswers());
+                    map.put("totalQuestions", totalQuestions);
+                    map.put("submittedAt", attempt.getSubmittedAt());
+
+                    return map;
+                })
+                .toList();
+    }
+
+    public Map<String, Object> getAssessmentAttemptDetails(Long assessmentId, Long attemptId) {
+        AssessmentAttempt attempt = attemptRepository.findById(attemptId)
+                .orElseThrow(() -> new RuntimeException("Attempt not found"));
+
+        if (attempt.getAssessment() == null || !attempt.getAssessment().getId().equals(assessmentId)) {
+            throw new RuntimeException("Attempt does not belong to this assessment");
+        }
+
+        Map<String, Object> map = new HashMap<>();
+        map.put("attempt", getAssessmentAttempts(assessmentId)
+                .stream()
+                .filter(item -> item.get("id").equals(attemptId))
+                .findFirst()
+                .orElse(Map.of()));
+        map.put("answers", List.of());
+
+        return map;
+    }
+
+    @Transactional
+    public void deleteAssessment(Long assessmentId) {
+        String email = securityUtils.getCurrentUserEmail();
+
+        Assessment assessment = assessmentRepository.findDetailedAssessment(assessmentId)
+                .orElseThrow(() -> new RuntimeException("Assessment not found"));
+
+        if (assessment.getTrainer() == null || !email.equals(assessment.getTrainer().getEmail())) {
+            throw new RuntimeException("Access denied");
+        }
+
+        assessmentRepository.delete(assessment);
     }
 }
