@@ -1,4 +1,4 @@
-package com.vidhuratech.jobs.trainer.service;
+package com.vidhuratech.jobs.student.service;
 
 import com.vidhuratech.jobs.common.security.SecurityUtils;
 import com.vidhuratech.jobs.lms.batch.entity.Batch;
