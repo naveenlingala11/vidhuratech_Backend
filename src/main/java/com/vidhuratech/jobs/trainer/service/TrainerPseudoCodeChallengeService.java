@@ -187,6 +187,35 @@ public class TrainerPseudoCodeChallengeService {
         );
     }
 
+    @Transactional
+    public Map<String, Object> createBulkChallenges(List<Map<String, Object>> payloads) {
+
+        List<Map<String, Object>> created = new ArrayList<>();
+
+        int successCount = 0;
+        int failedCount = 0;
+
+        for (Map<String, Object> payload : payloads) {
+
+            try {
+                Map<String, Object> saved = createChallenge(payload);
+                created.add(saved);
+                successCount++;
+            } catch (Exception ex) {
+                failedCount++;
+                created.add(
+                        Map.of("title", String.valueOf(payload.getOrDefault(
+                                "title","Unknown")),
+                                "error", ex.getMessage()));
+            }
+        }
+        return Map.of(
+                "successCount", successCount,
+                "failedCount", failedCount,
+                "results", created
+        );
+    }
+
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getTrainerChallenges() {
         String email = securityUtils.getCurrentUserEmail();

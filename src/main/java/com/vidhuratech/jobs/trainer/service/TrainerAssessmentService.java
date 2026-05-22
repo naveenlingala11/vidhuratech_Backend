@@ -4,8 +4,10 @@ import com.vidhuratech.jobs.common.security.SecurityUtils;
 import com.vidhuratech.jobs.lms.batch.entity.Batch;
 import com.vidhuratech.jobs.lms.batch.repository.BatchRepository;
 import com.vidhuratech.jobs.trainer.entity.Assessment;
+import com.vidhuratech.jobs.trainer.entity.AssessmentAnswer;
 import com.vidhuratech.jobs.trainer.entity.AssessmentAttempt;
 import com.vidhuratech.jobs.trainer.entity.AssessmentQuestion;
+import com.vidhuratech.jobs.trainer.repository.AssessmentAnswerRepository;
 import com.vidhuratech.jobs.trainer.repository.AssessmentAttemptRepository;
 import com.vidhuratech.jobs.trainer.repository.AssessmentRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,23 +22,17 @@ import java.util.*;
 public class TrainerAssessmentService {
 
     private final AssessmentRepository assessmentRepository;
-
     private final AssessmentAttemptRepository attemptRepository;
-
     private final BatchRepository batchRepository;
-
     private final SecurityUtils securityUtils;
+    private final AssessmentAnswerRepository answerRepository;
 
     @Transactional
     public Map<String, Object> createAssessment(
             Map<String, Object> payload
     ) {
-
         try {
-
-            Long batchId = Long.valueOf(
-                    String.valueOf(payload.get("batchId"))
-            );
+            Long batchId = Long.valueOf(String.valueOf(payload.get("batchId")));
 
             Batch batch = batchRepository
                     .findById(batchId)
@@ -70,7 +66,6 @@ public class TrainerAssessmentService {
             }
 
             for (Object obj : rawList) {
-
                 if (!(obj instanceof Map<?, ?> q)) {
                     throw new RuntimeException(
                             "Invalid question format"
@@ -78,7 +73,6 @@ public class TrainerAssessmentService {
                 }
 
                 Object rawOptions = q.get("options");
-
                 if (!(rawOptions instanceof Map<?, ?> options)) {
                     throw new RuntimeException(
                             "Invalid options format"
@@ -88,43 +82,13 @@ public class TrainerAssessmentService {
                 AssessmentQuestion question =
                         AssessmentQuestion.builder()
                                 .assessment(assessment)
-                                .question(
-                                        String.valueOf(
-                                                q.get("question")
-                                        )
-                                )
-                                .optionA(
-                                        String.valueOf(
-                                                options.get("A")
-                                        )
-                                )
-                                .optionB(
-                                        String.valueOf(
-                                                options.get("B")
-                                        )
-                                )
-                                .optionC(
-                                        String.valueOf(
-                                                options.get("C")
-                                        )
-                                )
-                                .optionD(
-                                        String.valueOf(
-                                                options.get("D")
-                                        )
-                                )
-                                .correctAnswer(
-                                        String.valueOf(
-                                                q.get("correctAnswer")
-                                        ).toUpperCase()
-                                )
-                                .marks(
-                                        Integer.valueOf(
-                                                String.valueOf(
-                                                        q.get("marks")
-                                                )
-                                        )
-                                )
+                                .question(String.valueOf(q.get("question")))
+                                .optionA(String.valueOf(options.get("A")))
+                                .optionB(String.valueOf(options.get("B")))
+                                .optionC(String.valueOf(options.get("C")))
+                                .optionD(String.valueOf(options.get("D")))
+                                .correctAnswer(String.valueOf(q.get("correctAnswer")).toUpperCase())
+                                .marks(Integer.valueOf(String.valueOf(q.get("marks"))))
                                 .build();
 
                 assessment.getQuestions().add(question);
@@ -132,39 +96,16 @@ public class TrainerAssessmentService {
 
             assessmentRepository.save(assessment);
 
-            Map<String, Object> response =
-                    new HashMap<>();
-
-            response.put(
-                    "assessmentId",
-                    assessment.getId()
-            );
-
-            response.put(
-                    "title",
-                    assessment.getTitle()
-            );
-
-            response.put(
-                    "questionsCount",
-                    assessment.getQuestions().size()
-            );
-
-            response.put(
-                    "message",
-                    "Assessment created successfully"
-            );
-
+            Map<String, Object> response = new HashMap<>();
+            response.put("assessmentId", assessment.getId());
+            response.put("title", assessment.getTitle());
+            response.put("questionsCount", assessment.getQuestions().size());
+            response.put("message", "Assessment created successfully");
             return response;
 
         } catch (Exception e) {
-
             e.printStackTrace();
-
-            throw new RuntimeException(
-                    "Failed to create assessment: "
-                            + e.getMessage()
-            );
+            throw new RuntimeException("Failed to create assessment: " + e.getMessage());
         }
     }
     @Transactional(readOnly = true)
@@ -272,23 +213,62 @@ public class TrainerAssessmentService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public Map<String, Object> getAssessmentAttemptDetails(Long assessmentId, Long attemptId) {
-        AssessmentAttempt attempt = attemptRepository.findById(attemptId)
-                .orElseThrow(() -> new RuntimeException("Attempt not found"));
 
-        if (attempt.getAssessment() == null || !attempt.getAssessment().getId().equals(assessmentId)) {
-            throw new RuntimeException("Attempt does not belong to this assessment");
+        AssessmentAttempt attempt = attemptRepository.findById(attemptId).orElseThrow(() ->
+                                new RuntimeException("Attempt not found"));
+
+        if (attempt.getAssessment() == null || !attempt.getAssessment().getId().equals(assessmentId)
+        ) {
+            throw new RuntimeException(
+                    "Attempt does not belong to this assessment"
+            );
         }
 
-        Map<String, Object> map = new HashMap<>();
-        map.put("attempt", getAssessmentAttempts(assessmentId)
-                .stream()
-                .filter(item -> item.get("id").equals(attemptId))
-                .findFirst()
-                .orElse(Map.of()));
-        map.put("answers", List.of());
+        List<AssessmentAnswer> answers = answerRepository.findByAttemptId(attemptId);
 
-        return map;
+        List<Map<String, Object>> detailedAnswers =
+                answers.stream()
+                        .map(answer -> {
+
+                            AssessmentQuestion q = answer.getQuestion();
+
+                            Map<String, Object> item = new LinkedHashMap<>();
+
+                            item.put("questionId", q.getId());
+                            item.put("question", q.getQuestion());
+                            item.put("questionText", q.getQuestion());
+                            item.put("options", Map.of("A", q.getOptionA() == null ? "" : q.getOptionA(),
+                                                        "B", q.getOptionB() == null ? "" : q.getOptionB(),
+                                                        "C", q.getOptionC() == null ? "" : q.getOptionC(),
+                                                        "D", q.getOptionD() == null ? "" : q.getOptionD()));
+                            item.put("selectedOption", answer.getSelectedAnswer());
+                            item.put("selectedAnswer", answer.getSelectedAnswer());
+                            item.put("correctOption", q.getCorrectAnswer());
+                            item.put("correctAnswer", q.getCorrectAnswer());
+                            item.put("correct", Boolean.TRUE.equals(answer.getCorrect()));
+                            item.put("marksAwarded", Boolean.TRUE.equals(answer.getCorrect()) ? q.getMarks() : 0);
+                            item.put("marks", q.getMarks());
+                            item.put("explanation", q.getExplanation() == null ? "" : q.getExplanation());
+                            return item;
+                        }).toList();
+
+        Map<String, Object> response = new LinkedHashMap<>();
+
+        response.put("attempt", getAssessmentAttempts(assessmentId)
+                        .stream()
+                        .filter(item -> item.get("id").equals(attemptId))
+                        .findFirst()
+                        .orElse(Map.of())
+        );
+        response.put("answers", detailedAnswers);
+        response.put("totalQuestions", detailedAnswers.size());
+        response.put("correctAnswers", detailedAnswers.stream()
+                        .filter(a -> Boolean.TRUE.equals(a.get("correct")))
+                        .count());
+
+        return response;
     }
 
     @Transactional
