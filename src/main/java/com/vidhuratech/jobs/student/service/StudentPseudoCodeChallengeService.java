@@ -6,6 +6,7 @@ import com.vidhuratech.jobs.lms.batch.repository.BatchEnrollmentRepository;
 import com.vidhuratech.jobs.trainer.entity.*;
 import com.vidhuratech.jobs.trainer.repository.PseudoCodeAttemptRepository;
 import com.vidhuratech.jobs.trainer.repository.PseudoCodeChallengeRepository;
+import com.vidhuratech.jobs.trainer.repository.PseudoCodeDraftRepository;
 import com.vidhuratech.jobs.user.entity.User;
 import com.vidhuratech.jobs.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ public class StudentPseudoCodeChallengeService {
     private final BatchEnrollmentRepository batchEnrollmentRepository;
     private final SecurityUtils securityUtils;
     private final CodeExecutionService codeExecutionService;
+    private final PseudoCodeDraftRepository draftRepository;
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getStudentChallenges() {
@@ -48,6 +50,7 @@ public class StudentPseudoCodeChallengeService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> getChallenge(Long id) {
+
         User student = getCurrentStudent();
 
         PseudoCodeChallenge challenge = challengeRepository.findById(id)
@@ -55,24 +58,40 @@ public class StudentPseudoCodeChallengeService {
 
         verifyStudentHasAccess(student, challenge.getBatchId());
 
-        Map<String, Object> map = mapChallengeForStudent(challenge, student);
+        Map<String, Object> map =
+                mapChallengeForStudent(challenge, student);
 
         map.put("constraintsText", challenge.getConstraintsText());
         map.put("inputFormat", challenge.getInputFormat());
         map.put("outputFormat", challenge.getOutputFormat());
 
-        map.put("testCases", challenge.getTestCases().stream().map(tc -> {
-            Map<String, Object> t = new LinkedHashMap<>();
-            t.put("id", tc.getId());
-            t.put("inputData", tc.getInputData());
-            t.put("marks", tc.getMarks());
+        map.put(
+                "testCases",
+                challenge.getTestCases().stream().map(tc -> {
 
-            // Student side lo expected output show avvali ante keep this.
-            // Hidden tests feature kavali ante DB lo hidden field add chesi condition pettochu.
-            t.put("expectedOutput", tc.getExpectedOutput());
+                    Map<String, Object> t = new LinkedHashMap<>();
 
-            return t;
-        }).toList());
+                    t.put("id", tc.getId());
+                    t.put("inputData", tc.getInputData());
+                    t.put("marks", tc.getMarks());
+                    t.put("expectedOutput", tc.getExpectedOutput());
+
+                    return t;
+
+                }).toList()
+        );
+
+        draftRepository
+                .findTopByChallengeIdAndStudentIdOrderBySavedAtDesc(
+                        challenge.getId(),
+                        student.getId()
+                )
+                .ifPresent(draft -> {
+
+                    map.put("savedCode", draft.getSourceCode());
+                    map.put("savedLanguage", draft.getLanguage());
+
+                });
 
         return map;
     }
@@ -181,6 +200,80 @@ public class StudentPseudoCodeChallengeService {
         attemptRepository.save(attempt);
 
         return mapAttemptResult(attempt);
+    }
+
+    @Transactional
+    public Map<String, Object> saveDraft(Long challengeId, Map<String, Object> payload) {
+
+        User student = getCurrentStudent();
+
+        PseudoCodeChallenge challenge = challengeRepository.findById(challengeId)
+                .orElseThrow(() -> new RuntimeException("Challenge not found"));
+
+        String language = String.valueOf(payload.get("language"));
+        String sourceCode = String.valueOf(payload.get("sourceCode"));
+
+        PseudoCodeDraft draft = PseudoCodeDraft.builder()
+                .challenge(challenge)
+                .student(student)
+                .language(language)
+                .sourceCode(sourceCode)
+                .savedAt(LocalDateTime.now())
+                .build();
+
+        draftRepository.save(draft);
+
+        return Map.of(
+                "saved", true,
+                "savedAt", draft.getSavedAt()
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> runChallenge(Long challengeId, Map<String, Object> payload) {
+
+        PseudoCodeChallenge challenge = challengeRepository.findById(challengeId)
+                .orElseThrow(() -> new RuntimeException("Challenge not found"));
+
+        String language = String.valueOf(payload.get("language"));
+        String sourceCode = String.valueOf(payload.get("sourceCode"));
+
+        List<Map<String, Object>> results = new ArrayList<>();
+
+        int score = 0;
+
+        for (PseudoCodeTestCase testCase : challenge.getTestCases()) {
+
+            CodeExecutionService.ExecutionResult execution =
+                    codeExecutionService.run(language, sourceCode, testCase.getInputData());
+
+            boolean correct =
+                    execution.isSuccess() &&
+                            normalize(execution.getOutput())
+                                    .equals(normalize(testCase.getExpectedOutput()));
+
+            int marks = correct ? testCase.getMarks() : 0;
+            score += marks;
+
+            results.add(Map.of(
+                    "inputData", testCase.getInputData(),
+                    "expectedOutput", testCase.getExpectedOutput(),
+                    "actualOutput", execution.getOutput(),
+                    "status", correct ? "PASS" : "FAIL",
+                    "errorMessage", execution.getError(),
+                    "marks", marks
+            ));
+        }
+
+        int percentage = challenge.getTotalMarks() == 0
+                ? 0
+                : (score * 100) / challenge.getTotalMarks();
+
+        return Map.of(
+                "status", percentage >= challenge.getPassPercentage() ? "PASS" : "FAIL",
+                "percentage", percentage,
+                "testResults", results
+        );
     }
 
     private Map<String, Object> mapAttemptResult(PseudoCodeAttempt attempt) {

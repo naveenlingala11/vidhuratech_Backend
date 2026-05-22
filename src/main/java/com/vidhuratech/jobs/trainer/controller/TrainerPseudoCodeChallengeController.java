@@ -72,4 +72,16 @@ public class TrainerPseudoCodeChallengeController {
                 .data(service.updateChallenge(id, payload))
                 .build();
     }
+
+    @PostMapping("/bulk")
+    @PreAuthorize("hasRole('TRAINER')")
+    public ApiResponse<?> bulkCreate(
+            @RequestBody java.util.List<Map<String, Object>> payload
+    ) {
+        return ApiResponse.builder()
+                .success(true)
+                .message("Bulk challenges created successfully")
+                .data(service.createBulkChallenges(payload))
+                .build();
+    }
 }

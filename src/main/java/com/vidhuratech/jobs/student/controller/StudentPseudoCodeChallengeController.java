@@ -41,4 +41,28 @@ public class StudentPseudoCodeChallengeController {
                 .data(service.submitChallenge(id, payload))
                 .build();
     }
+
+    @PostMapping("/{id}/run")
+    public ApiResponse<?> run(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> payload
+    ) {
+        return ApiResponse.builder()
+                .success(true)
+                .message("Code executed successfully")
+                .data(service.runChallenge(id, payload))
+                .build();
+    }
+
+    @PostMapping("/{id}/save")
+    public ApiResponse<?> save(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> payload
+    ) {
+        return ApiResponse.builder()
+                .success(true)
+                .message("Code saved successfully")
+                .data(service.saveDraft(id, payload))
+                .build();
+    }
 }
