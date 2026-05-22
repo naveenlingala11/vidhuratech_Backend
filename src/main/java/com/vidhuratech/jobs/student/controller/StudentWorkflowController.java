@@ -1,7 +1,7 @@
-package com.vidhuratech.jobs.trainer.controller;
+package com.vidhuratech.jobs.student.controller;
 
 import com.vidhuratech.jobs.common.api.ApiResponse;
-import com.vidhuratech.jobs.trainer.service.StudentWorkflowService;
+import com.vidhuratech.jobs.student.service.StudentWorkflowService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
