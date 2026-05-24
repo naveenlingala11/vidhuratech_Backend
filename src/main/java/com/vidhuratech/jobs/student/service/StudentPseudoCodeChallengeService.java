@@ -75,23 +75,48 @@ public class StudentPseudoCodeChallengeService {
                     t.put("inputData", tc.getInputData());
                     t.put("marks", tc.getMarks());
                     t.put("expectedOutput", tc.getExpectedOutput());
-
+                    t.put("hidden", Boolean.TRUE.equals(tc.getHidden()));
                     return t;
 
                 }).toList()
         );
 
-        draftRepository
-                .findTopByChallengeIdAndStudentIdOrderBySavedAtDesc(
-                        challenge.getId(),
-                        student.getId()
-                )
-                .ifPresent(draft -> {
+        Map<String, String> savedDrafts =
+                new LinkedHashMap<>();
 
-                    map.put("savedCode", draft.getSourceCode());
-                    map.put("savedLanguage", draft.getLanguage());
+        for (String lang : List.of(
+                "PYTHON",
+                "JAVA",
+                "C",
+                "CPP",
+                "CSHARP",
+                "FSHARP",
+                "PHP",
+                "RUBY",
+                "HASKELL",
+                "GO",
+                "RUST",
+                "TYPESCRIPT"
+        )) {
 
-                });
+            draftRepository
+                    .findTopByChallengeIdAndStudentIdAndLanguageOrderBySavedAtDesc(
+                            challenge.getId(),
+                            student.getId(),
+                            lang
+                    )
+                    .ifPresent(draft ->
+                            savedDrafts.put(
+                                    lang,
+                                    draft.getSourceCode()
+                            )
+                    );
+        }
+
+        map.put(
+                "savedDrafts",
+                savedDrafts
+        );
 
         return map;
     }
@@ -231,49 +256,60 @@ public class StudentPseudoCodeChallengeService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> runChallenge(Long challengeId, Map<String, Object> payload) {
+        User student = getCurrentStudent();
 
         PseudoCodeChallenge challenge = challengeRepository.findById(challengeId)
                 .orElseThrow(() -> new RuntimeException("Challenge not found"));
 
-        String language = String.valueOf(payload.get("language"));
+        verifyStudentHasAccess(student, challenge.getBatchId());
+
+        String language = String.valueOf(payload.get("language")).trim().toUpperCase();
         String sourceCode = String.valueOf(payload.get("sourceCode"));
 
         List<Map<String, Object>> results = new ArrayList<>();
 
         int score = 0;
+        String compileError = "";
 
         for (PseudoCodeTestCase testCase : challenge.getTestCases()) {
-
             CodeExecutionService.ExecutionResult execution =
                     codeExecutionService.run(language, sourceCode, testCase.getInputData());
 
             boolean correct =
                     execution.isSuccess() &&
-                            normalize(execution.getOutput())
-                                    .equals(normalize(testCase.getExpectedOutput()));
+                            normalize(execution.getOutput()).equals(normalize(testCase.getExpectedOutput()));
 
-            int marks = correct ? testCase.getMarks() : 0;
+            int marks = correct ? (testCase.getMarks() == null ? 0 : testCase.getMarks()) : 0;
             score += marks;
 
-            results.add(Map.of(
-                    "inputData", testCase.getInputData(),
-                    "expectedOutput", testCase.getExpectedOutput(),
-                    "actualOutput", execution.getOutput(),
-                    "status", correct ? "PASS" : "FAIL",
-                    "errorMessage", execution.getError(),
-                    "marks", marks
-            ));
+            if (!execution.isSuccess() && compileError.isBlank()) {
+                compileError = execution.getError();
+            }
+
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("inputData", testCase.getInputData());
+            item.put("expectedOutput", testCase.getExpectedOutput());
+            item.put("actualOutput", execution.getOutput());
+            item.put("status", correct ? "PASS" : "FAIL");
+            item.put("errorMessage", execution.getError());
+            item.put("marks", testCase.getMarks());
+            item.put("marksObtained", marks);
+            item.put("executionTimeMs", execution.getExecutionTimeMs());
+
+            results.add(item);
         }
 
-        int percentage = challenge.getTotalMarks() == 0
-                ? 0
-                : (score * 100) / challenge.getTotalMarks();
+        int totalMarks = challenge.getTotalMarks() == null ? 0 : challenge.getTotalMarks();
+        int passPercentage = challenge.getPassPercentage() == null ? 100 : challenge.getPassPercentage();
+        int percentage = totalMarks == 0 ? 0 : (score * 100) / totalMarks;
 
-        return Map.of(
-                "status", percentage >= challenge.getPassPercentage() ? "PASS" : "FAIL",
-                "percentage", percentage,
-                "testResults", results
-        );
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("status", percentage >= passPercentage ? "PASS" : "FAIL");
+        response.put("percentage", percentage);
+        response.put("compileError", compileError);
+        response.put("testResults", results);
+
+        return response;
     }
 
     private Map<String, Object> mapAttemptResult(PseudoCodeAttempt attempt) {

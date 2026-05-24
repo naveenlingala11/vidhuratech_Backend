@@ -23,6 +23,9 @@ public class PseudoCodeTestCase {
 
     private Integer marks;
 
+    @Builder.Default
+    private Boolean hidden = false;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "challenge_id")
     private PseudoCodeChallenge challenge;

@@ -12,4 +12,11 @@ public interface PseudoCodeDraftRepository
             Long challengeId,
             Long studentId
     );
+
+    Optional<PseudoCodeDraft>
+    findTopByChallengeIdAndStudentIdAndLanguageOrderBySavedAtDesc(
+            Long challengeId,
+            Long studentId,
+            String language
+    );
 }
