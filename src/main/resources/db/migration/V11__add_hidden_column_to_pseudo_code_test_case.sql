@@ -1,0 +1,2 @@
+ALTER TABLE pseudo_code_test_case
+    ADD COLUMN IF NOT EXISTS hidden BOOLEAN DEFAULT FALSE;

@@ -58,31 +58,59 @@ public class CodeExecutionService {
                     HttpResponse.BodyHandlers.ofString()
             );
 
+            String rawBody = response.body();
+
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 return ExecutionResult.builder()
                         .success(false)
                         .output("")
-                        .error("OnlineCompiler HTTP " + response.statusCode() + ": " + response.body())
+                        .error("OnlineCompiler HTTP " + response.statusCode() + ": " + rawBody)
                         .executionTimeMs(0L)
                         .build();
             }
 
             Map<String, Object> result = objectMapper.readValue(
-                    response.body(),
+                    rawBody,
                     new TypeReference<Map<String, Object>>() {}
             );
 
-            String output = stringValue(result.get("output"));
-            String error = stringValue(result.get("error"));
+            String output = firstText(
+                    stringValue(result.get("output")),
+                    stringValue(result.get("stdout"))
+            );
+
+            String error = firstText(
+                    stringValue(result.get("error")),
+                    stringValue(result.get("stderr")),
+                    stringValue(result.get("compile_output")),
+                    stringValue(result.get("message")),
+                    stringValue(result.get("exception")),
+                    stringValue(result.get("details"))
+            );
+
             String status = stringValue(result.get("status"));
             int exitCode = intValue(result.get("exit_code"));
 
-            boolean success = "success".equalsIgnoreCase(status) && exitCode == 0;
+            boolean success =
+                    "success".equalsIgnoreCase(status)
+                            && exitCode == 0
+                            && !hasText(error);
+
+            String finalError = "";
+            if (!success) {
+                if (hasText(error)) {
+                    finalError = error;
+                } else if (hasText(output) && !"success".equalsIgnoreCase(status)) {
+                    finalError = output;
+                } else {
+                    finalError = "Code execution failed.\nRaw compiler response:\n" + rawBody;
+                }
+            }
 
             return ExecutionResult.builder()
                     .success(success)
                     .output(output)
-                    .error(success ? "" : firstText(error, "Execution failed with status: " + status))
+                    .error(finalError)
                     .executionTimeMs(timeToMillis(result.get("total")))
                     .build();
 
@@ -90,7 +118,7 @@ public class CodeExecutionService {
             return ExecutionResult.builder()
                     .success(false)
                     .output("")
-                    .error(e.getMessage())
+                    .error("Compiler service failed: " + e.getMessage())
                     .executionTimeMs(0L)
                     .build();
         }

@@ -62,6 +62,7 @@ public class TrainerPseudoCodeChallengeService {
 
         Object rawTestCases = payload.getOrDefault("testCases", List.of());
         if (rawTestCases instanceof List<?> testCases) {
+            int index = 0;
             for (Object obj : testCases) {
                 if (!(obj instanceof Map<?, ?> tc)) continue;
 
@@ -71,8 +72,10 @@ public class TrainerPseudoCodeChallengeService {
                                 .inputData(getString(tc, "inputData", ""))
                                 .expectedOutput(getString(tc, "expectedOutput", ""))
                                 .marks(getInt(tc, "marks", 0))
+                                .hidden(index >= 3)
                                 .build()
                 );
+                index++;
             }
         }
 
@@ -160,7 +163,7 @@ public class TrainerPseudoCodeChallengeService {
         Object rawTestCases = payload.getOrDefault("testCases", List.of());
 
         if (rawTestCases instanceof List<?> testCases) {
-
+            int index = 0;
             for (Object obj : testCases) {
 
                 if (!(obj instanceof Map<?, ?> tc)) continue;
@@ -171,8 +174,10 @@ public class TrainerPseudoCodeChallengeService {
                                 .inputData(getString(tc, "inputData", ""))
                                 .expectedOutput(getString(tc, "expectedOutput", ""))
                                 .marks(getInt(tc, "marks", 0))
+                                .hidden(index >= 3)
                                 .build()
                 );
+                index++;
             }
         }
 
@@ -329,6 +334,7 @@ public class TrainerPseudoCodeChallengeService {
             t.put("inputData", tc.getInputData());
             t.put("expectedOutput", tc.getExpectedOutput());
             t.put("marks", tc.getMarks());
+            t.put("hidden", Boolean.TRUE.equals(tc.getHidden()));
             return t;
         }).toList());
 
