@@ -46,4 +46,17 @@ public interface AssessmentRepository extends JpaRepository<Assessment, Long> {
         WHERE a.id = :id
     """)
     Optional<Assessment> findDetailedAssessment(Long id);
+
+    @Query("""
+    SELECT DISTINCT a
+    FROM Assessment a
+    LEFT JOIN FETCH a.questions
+    LEFT JOIN FETCH a.batch b
+    LEFT JOIN FETCH b.course
+    WHERE a.active = true
+    AND (a.startTime IS NULL OR a.startTime <= :now)
+    AND (a.endTime IS NULL OR a.endTime >= :now)
+    ORDER BY a.id DESC
+""")
+    List<Assessment> findActivePublicAssessments(LocalDateTime now);
 }

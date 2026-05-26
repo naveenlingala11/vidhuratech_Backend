@@ -10,4 +10,6 @@ public interface PseudoCodeChallengeRepository extends JpaRepository<PseudoCodeC
     List<PseudoCodeChallenge> findByTrainerEmailOrderByCreatedAtDesc(String trainerEmail);
 
     List<PseudoCodeChallenge> findByBatchIdInAndActiveTrueOrderByCreatedAtDesc(List<Long> batchIds);
+
+    List<PseudoCodeChallenge> findByActiveTrueOrderByCreatedAtDesc();
 }

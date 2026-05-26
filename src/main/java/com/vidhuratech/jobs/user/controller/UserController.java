@@ -2,6 +2,7 @@ package com.vidhuratech.jobs.user.controller;
 
 import com.vidhuratech.jobs.common.api.ApiResponse;
 import com.vidhuratech.jobs.user.dto.CreateEmployeeDTO;
+import com.vidhuratech.jobs.user.dto.UpdateUserDTO;
 import com.vidhuratech.jobs.user.entity.User;
 import com.vidhuratech.jobs.user.enums.UserRole;
 import com.vidhuratech.jobs.user.repository.UserRepository;
@@ -31,9 +32,7 @@ public class UserController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-
         Page<User> users;
-
         Pageable pageable = PageRequest.of(page, size);
 
         if (role != null && !role.isBlank()) {
@@ -60,15 +59,33 @@ public class UserController {
         ));
     }
 
-    @GetMapping("/students/search")
-    public ApiResponse<?> searchStudents(
-            @RequestParam String keyword
+    // NEW CODE
+    @GetMapping("/advanced")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<?> getUsersAdvanced(
+            @RequestParam(required = false) String role,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String active,
+            @RequestParam(required = false) String deleted,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir
     ) {
-        var users = userRepository
-                .findByRoleAndNameContainingIgnoreCase(
-                        UserRole.STUDENT,
-                        keyword
-                );
+        return ApiResponse.success(
+                userService.getUsers(role, keyword, active, deleted, page, size, sortBy, sortDir)
+        );
+    }
+
+    @GetMapping("/stats")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<?> getUserStats() {
+        return ApiResponse.success(userService.getUserStats());
+    }
+
+    @GetMapping("/students/search")
+    public ApiResponse<?> searchStudents(@RequestParam String keyword) {
+        var users = userRepository.findByRoleAndNameContainingIgnoreCase(UserRole.STUDENT, keyword);
 
         var data = users.stream()
                 .map(u -> Map.of(
@@ -78,18 +95,37 @@ public class UserController {
                 ))
                 .toList();
 
-        return ApiResponse.builder()
-                .success(true)
-                .data(data)
-                .build();
+        return ApiResponse.builder().success(true).data(data).build();
     }
 
     @PostMapping("/employees")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<?> createEmployee(@RequestBody CreateEmployeeDTO dto) {
-        return ApiResponse.success(
-                userService.createEmployee(dto),
-                "Employee created. Setup link sent."
-        );
+        return ApiResponse.success(userService.createEmployee(dto), "Employee created. Setup link sent.");
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<?> updateUser(@PathVariable Long id, @RequestBody UpdateUserDTO dto) {
+        return ApiResponse.success(userService.updateUser(id, dto), "User updated successfully");
+    }
+
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<?> updateStatus(@PathVariable Long id, @RequestBody Map<String, Boolean> body) {
+        return ApiResponse.success(userService.updateStatus(id, body.get("active")), "Status updated successfully");
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<?> deleteUser(@PathVariable Long id) {
+        userService.deleteUser(id);
+        return ApiResponse.success(null, "User deleted successfully");
+    }
+
+    @PatchMapping("/{id}/restore")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<?> restoreUser(@PathVariable Long id) {
+        return ApiResponse.success(userService.restoreUser(id), "User restored successfully");
     }
 }

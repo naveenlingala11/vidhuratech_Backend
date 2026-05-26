@@ -3,17 +3,29 @@ package com.vidhuratech.jobs.user.service;
 import com.vidhuratech.jobs.common.config.AppConfig;
 import com.vidhuratech.jobs.common.service.EmailService;
 import com.vidhuratech.jobs.user.dto.CreateEmployeeDTO;
+import com.vidhuratech.jobs.user.dto.UpdateUserDTO;
 import com.vidhuratech.jobs.user.dto.UserResponse;
 import com.vidhuratech.jobs.user.entity.PasswordResetToken;
 import com.vidhuratech.jobs.user.entity.User;
+import com.vidhuratech.jobs.user.enums.UserRole;
 import com.vidhuratech.jobs.user.repository.PasswordResetTokenRepository;
 import com.vidhuratech.jobs.user.repository.UserRepository;
+import jakarta.persistence.criteria.Predicate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+
 
 @Service
 public class UserService {
@@ -169,6 +181,205 @@ public class UserService {
                 link,
                 link,
                 java.time.Year.now().getValue()
+        );
+    }
+
+    public Map<String, Object> getUsers(
+            String role,
+            String keyword,
+            String active,
+            String deleted,
+            int page,
+            int size,
+            String sortBy,
+            String sortDir
+    ) {
+        String safeSortBy = switch (sortBy) {
+            case "id", "name", "email", "role", "active", "deleted" -> sortBy;
+            default -> "id";
+        };
+
+        Sort sort = "asc".equalsIgnoreCase(sortDir)
+                ? Sort.by(safeSortBy).ascending()
+                : Sort.by(safeSortBy).descending();
+
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        UserRole userRole = null;
+        if (role != null && !role.isBlank()) {
+            userRole = UserRole.valueOf(role);
+        }
+
+        Boolean activeValue = parseBooleanFilter(active);
+        Boolean deletedValue = parseBooleanFilter(deleted);
+
+        if (deletedValue == null) {
+            deletedValue = false;
+        }
+
+        String searchKeyword = keyword == null || keyword.isBlank()
+                ? null
+                : keyword.trim().toLowerCase();
+
+        UserRole finalUserRole = userRole;
+        Boolean finalActiveValue = activeValue;
+        Boolean finalDeletedValue = deletedValue;
+        String finalSearchKeyword = searchKeyword;
+
+        Specification<User> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (finalUserRole != null) {
+                predicates.add(cb.equal(root.get("role"), finalUserRole));
+            }
+
+            if (finalSearchKeyword != null) {
+                predicates.add(cb.or(
+                        cb.like(cb.lower(cb.coalesce(root.get("name"), "")), "%" + finalSearchKeyword + "%"),
+                        cb.like(cb.lower(cb.coalesce(root.get("email"), "")), "%" + finalSearchKeyword + "%")
+                ));
+            }
+
+            if (finalActiveValue != null) {
+                predicates.add(cb.equal(root.get("active"), finalActiveValue));
+            }
+
+            predicates.add(cb.equal(cb.coalesce(root.get("deleted"), false), finalDeletedValue));
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        Page<User> users = userRepo.findAll(spec, pageable);
+
+        var content = users.getContent().stream()
+                .map(u -> Map.of(
+                        "id", u.getId(),
+                        "name", u.getName() == null ? "" : u.getName(),
+                        "email", u.getEmail() == null ? "" : u.getEmail(),
+                        "phone", u.getPhone() == null ? "" : u.getPhone(),
+                        "role", u.getRole() == null ? "" : u.getRole().name(),
+                        "active", Boolean.TRUE.equals(u.getActive()),
+                        "deleted", Boolean.TRUE.equals(u.getDeleted())
+                ))
+                .toList();
+
+        return Map.of(
+                "content", content,
+                "totalPages", users.getTotalPages(),
+                "totalElements", users.getTotalElements(),
+                "page", users.getNumber(),
+                "size", users.getSize()
+        );
+    }
+
+    private Boolean parseBooleanFilter(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        if ("true".equalsIgnoreCase(value)) {
+            return true;
+        }
+
+        if ("false".equalsIgnoreCase(value)) {
+            return false;
+        }
+
+        return null;
+    }
+
+    public Map<String, Object> getUserStats() {
+        return Map.of(
+                "totalUsers", userRepo.countByDeletedFalse(),
+                "activeUsers", userRepo.countByDeletedFalseAndActiveTrue(),
+                "inactiveUsers", userRepo.countByDeletedFalseAndActiveFalse(),
+                "deletedUsers", userRepo.countByDeletedTrue()
+        );
+    }
+
+    public UserResponse updateUser(Long id, UpdateUserDTO dto) {
+        User user = userRepo.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (Boolean.TRUE.equals(user.getDeleted())) {
+            throw new RuntimeException("Deleted user cannot be updated. Restore first.");
+        }
+
+        if (dto.getEmail() != null && !dto.getEmail().equalsIgnoreCase(user.getEmail())) {
+            if (userRepo.existsByEmail(dto.getEmail())) {
+                throw new RuntimeException("Email already exists");
+            }
+        }
+
+        user.setName(dto.getName());
+        user.setEmail(dto.getEmail());
+        user.setPhone(dto.getPhone());
+        user.setRole(dto.getRole());
+        user.setUpdatedAt(LocalDateTime.now());
+
+        userRepo.save(user);
+
+        return new UserResponse(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getPhone(),
+                user.getRole(),
+                user.getActive()
+        );
+    }
+
+    public UserResponse updateStatus(Long id, Boolean active) {
+        User user = userRepo.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (Boolean.TRUE.equals(user.getDeleted())) {
+            throw new RuntimeException("Deleted user status cannot be changed");
+        }
+
+        user.setActive(Boolean.TRUE.equals(active));
+        user.setUpdatedAt(LocalDateTime.now());
+
+        userRepo.save(user);
+
+        return new UserResponse(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getPhone(),
+                user.getRole(),
+                user.getActive()
+        );
+    }
+
+    public void deleteUser(Long id) {
+        User user = userRepo.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        user.setDeleted(true);
+        user.setActive(false);
+        user.setUpdatedAt(LocalDateTime.now());
+
+        userRepo.save(user);
+    }
+
+    public UserResponse restoreUser(Long id) {
+        User user = userRepo.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        user.setDeleted(false);
+        user.setActive(true);
+        user.setUpdatedAt(LocalDateTime.now());
+
+        userRepo.save(user);
+
+        return new UserResponse(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getPhone(),
+                user.getRole(),
+                user.getActive()
         );
     }
 }

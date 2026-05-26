@@ -54,4 +54,10 @@ public class PseudoCodeChallenge {
     @Builder.Default
     @OneToMany(mappedBy = "challenge", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PseudoCodeTestCase> testCases = new ArrayList<>();
+
+    private String challengeGroupId;
+
+    private String challengeGroupTitle;
+
+    private String companyName;
 }

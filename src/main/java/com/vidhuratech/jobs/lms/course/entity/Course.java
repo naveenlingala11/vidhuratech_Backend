@@ -3,6 +3,7 @@ package com.vidhuratech.jobs.lms.course.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -42,6 +43,10 @@ public class Course {
     private CourseStatus status;
 
     private Integer durationHours;
+
+    private LocalDate startDate;
+
+    private LocalDate endDate;
 
     @Builder.Default
     private Boolean active = true;

@@ -15,4 +15,6 @@ public interface PseudoCodeAttemptRepository extends JpaRepository<PseudoCodeAtt
             Long challengeId,
             Long studentId
     );
+
+    List<PseudoCodeAttempt> findByChallengeTrainerEmailOrderBySubmittedAtDesc(String trainerEmail);
 }
