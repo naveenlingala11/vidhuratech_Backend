@@ -41,4 +41,5 @@ AND (LOWER(l.name) LIKE LOWER(CONCAT('%', :search, '%'))
 
     // FIXED
     List<Lead> findAllByPhoneOrderByCreatedAtDesc(String phone);
-}
+
+    Optional<Lead> findFirstByPhoneOrderByCreatedAtDesc(String phone);}

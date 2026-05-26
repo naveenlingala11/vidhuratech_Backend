@@ -34,6 +34,15 @@ public class TrainerPseudoCodeChallengeController {
                 .build();
     }
 
+    @GetMapping("/submissions")
+    @PreAuthorize("hasRole('TRAINER')")
+    public ApiResponse<?> submissions() {
+        return ApiResponse.builder()
+                .success(true)
+                .data(service.getAllSubmissions())
+                .build();
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('TRAINER')")
     public ApiResponse<?> details(@PathVariable Long id) {

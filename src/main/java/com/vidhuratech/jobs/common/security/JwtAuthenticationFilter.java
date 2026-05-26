@@ -1,7 +1,9 @@
 package com.vidhuratech.jobs.common.security;
 
-import jakarta.servlet.*;
-import jakarta.servlet.http.*;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -28,12 +30,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String path = request.getServletPath();
 
-        if (path.startsWith("/api/auth")) {
+        if (isPublicAuthPath(path)) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        final String authHeader = request.getHeader("Authorization");
+        String authHeader = request.getHeader("Authorization");
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
@@ -49,11 +51,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String email = jwtUtil.extractEmail(token);
 
-        if (email != null &&
-                SecurityContextHolder.getContext().getAuthentication() == null) {
-
-            UserDetails userDetails =
-                    userDetailsService.loadUserByUsername(email);
+        if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
             UsernamePasswordAuthenticationToken authToken =
                     new UsernamePasswordAuthenticationToken(
@@ -63,13 +62,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     );
 
             authToken.setDetails(
-                    new WebAuthenticationDetailsSource()
-                            .buildDetails(request)
+                    new WebAuthenticationDetailsSource().buildDetails(request)
             );
-            authToken.getAuthorities().forEach(System.out::println);
+
             SecurityContextHolder.getContext().setAuthentication(authToken);
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isPublicAuthPath(String path) {
+        return path.equals("/api/auth/register")
+                || path.equals("/api/auth/login")
+                || path.equals("/api/auth/set-password")
+                || path.equals("/api/auth/send-otp")
+                || path.equals("/api/auth/verify-otp")
+                || path.equals("/api/auth/register/init")
+                || path.equals("/api/auth/register/verify")
+                || path.equals("/api/auth/resend-link")
+                || path.equals("/api/auth/validate-token");
     }
 }

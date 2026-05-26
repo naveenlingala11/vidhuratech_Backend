@@ -1,5 +1,6 @@
 package com.vidhuratech.jobs.leads.service;
 
+import com.vidhuratech.jobs.common.exception.AlreadyRegisteredException;
 import com.vidhuratech.jobs.leads.entity.Lead;
 import com.vidhuratech.jobs.leads.repository.LeadRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,31 +21,21 @@ import java.util.Optional;
 public class LeadService {
 
     private final LeadRepository repo;
-
     public void saveLead(Lead lead) {
         if (lead == null) {
             throw new RuntimeException("Invalid request");
         }
 
-        String rawPhone = lead.getPhone() == null ? "" : lead.getPhone().replaceAll("\\D", "");
+        String rawPhone = cleanPhone(lead.getPhone());
+
         if (rawPhone.isBlank()) {
             throw new RuntimeException("Phone is required");
         }
 
-        if (rawPhone.length() > 15) {
-            rawPhone = rawPhone.substring(rawPhone.length() - 15);
-        }
-
         lead.setPhone(rawPhone);
+        trimLeadFields(lead);
 
-        if (lead.getName() != null) lead.setName(lead.getName().trim());
-        if (lead.getEmail() != null) lead.setEmail(lead.getEmail().trim());
-        if (lead.getCourse() != null) lead.setCourse(lead.getCourse().trim());
-        if (lead.getCity() != null) lead.setCity(lead.getCity().trim());
-        if (lead.getMessage() != null) lead.setMessage(lead.getMessage().trim());
-        if (lead.getSource() != null) lead.setSource(lead.getSource().trim());
-
-        Optional<Lead> existing = repo.findByPhone(rawPhone);
+        Optional<Lead> existing = repo.findFirstByPhoneOrderByCreatedAtDesc(rawPhone);
 
         if (existing.isPresent()) {
             Lead old = existing.get();
@@ -61,15 +52,69 @@ public class LeadService {
             return;
         }
 
-        if (lead.getDeleted() == null) lead.setDeleted(false);
+        if (lead.getDeleted() == null) {
+            lead.setDeleted(false);
+        }
+
         repo.save(lead);
     }
+
+    public void savePublicPracticeLead(Lead lead) {
+        if (lead == null) {
+            throw new RuntimeException("Invalid request");
+        }
+
+        String rawPhone = cleanPhone(lead.getPhone());
+
+        if (rawPhone.isBlank()) {
+            throw new RuntimeException("Phone is required");
+        }
+
+        lead.setPhone(rawPhone);
+        trimLeadFields(lead);
+
+        Optional<Lead> existing = repo.findFirstByPhoneOrderByCreatedAtDesc(rawPhone);
+
+        if (existing.isPresent()) {
+            throw new AlreadyRegisteredException(
+                    "Already a member. Please login with your credentials to continue practice."
+            );
+        }
+
+        if (lead.getDeleted() == null) {
+            lead.setDeleted(false);
+        }
+
+        repo.save(lead);
+    }
+
     public void updateStatus(String phone, String status) {
-        Lead lead = repo.findByPhone(phone)
-                .orElseThrow(() -> new RuntimeException("Lead not found: " + phone));
+        String cleanPhone = cleanPhone(phone);
+
+        Lead lead = repo.findFirstByPhoneOrderByCreatedAtDesc(cleanPhone)
+                .orElseThrow(() -> new RuntimeException("Lead not found: " + cleanPhone));
 
         lead.setStatus(status);
         repo.save(lead);
+    }
+
+    private String cleanPhone(String phone) {
+        String rawPhone = phone == null ? "" : phone.replaceAll("\\D", "");
+
+        if (rawPhone.length() > 15) {
+            rawPhone = rawPhone.substring(rawPhone.length() - 15);
+        }
+
+        return rawPhone;
+    }
+
+    private void trimLeadFields(Lead lead) {
+        if (lead.getName() != null) lead.setName(lead.getName().trim());
+        if (lead.getEmail() != null) lead.setEmail(lead.getEmail().trim());
+        if (lead.getCourse() != null) lead.setCourse(lead.getCourse().trim());
+        if (lead.getCity() != null) lead.setCity(lead.getCity().trim());
+        if (lead.getMessage() != null) lead.setMessage(lead.getMessage().trim());
+        if (lead.getSource() != null) lead.setSource(lead.getSource().trim());
     }
 
     public List<Lead> getAllLeads() {
@@ -131,9 +176,10 @@ public class LeadService {
     }
 
     public void updateFollowUp(String phone, String date) {
+        String cleanPhone = cleanPhone(phone);
 
-        Lead lead = repo.findByPhone(phone)
-                .orElseThrow(() -> new RuntimeException("Lead not found: " + phone));
+        Lead lead = repo.findFirstByPhoneOrderByCreatedAtDesc(cleanPhone)
+                .orElseThrow(() -> new RuntimeException("Lead not found: " + cleanPhone));
 
         try {
             lead.setFollowUpDate(LocalDate.parse(date));

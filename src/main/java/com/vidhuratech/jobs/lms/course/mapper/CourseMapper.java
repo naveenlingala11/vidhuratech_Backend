@@ -17,6 +17,8 @@ public class CourseMapper {
                 .thumbnailUrl(dto.getThumbnailUrl())
                 .level(dto.getLevel())
                 .durationHours(dto.getDurationHours())
+                .startDate(dto.getStartDate())
+                .endDate(dto.getEndDate())
                 .price(dto.getPrice())
                 .metadataJson(dto.getMetadataJson()) // ✅ ADD
                 .status(CourseStatus.DRAFT)
@@ -34,6 +36,8 @@ public class CourseMapper {
                 .level(course.getLevel())
                 .status(course.getStatus())
                 .durationHours(course.getDurationHours())
+                .startDate(course.getStartDate())
+                .endDate(course.getEndDate())
                 .active(course.getActive())
                 .createdAt(course.getCreatedAt())
                 .price(course.getPrice())
@@ -47,6 +51,8 @@ public class CourseMapper {
         course.setThumbnailUrl(dto.getThumbnailUrl());
         course.setLevel(dto.getLevel());
         course.setDurationHours(dto.getDurationHours());
+        course.setStartDate(dto.getStartDate());
+        course.setEndDate(dto.getEndDate());
         course.setPrice(dto.getPrice());
         course.setMetadataJson(dto.getMetadataJson()); // ✅ ADD
     }

@@ -402,6 +402,9 @@ public class StudentPseudoCodeChallengeService {
         map.put("language", latest == null ? null : latest.getLanguage());
         map.put("allTestsPassed", latest != null && Boolean.TRUE.equals(latest.getAllTestsPassed()));
         map.put("lastSubmittedAt", latest == null ? null : latest.getSubmittedAt());
+        map.put("challengeGroupId", challenge.getChallengeGroupId() == null ? "LEGACY-" + challenge.getId() : challenge.getChallengeGroupId());
+        map.put("challengeGroupTitle", challenge.getChallengeGroupTitle() == null ? challenge.getTitle() : challenge.getChallengeGroupTitle());
+        map.put("companyName",challenge.getCompanyName() == null ? "" : challenge.getCompanyName());
 
         return map;
     }

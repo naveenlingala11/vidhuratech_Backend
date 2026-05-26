@@ -5,6 +5,7 @@ import com.vidhuratech.jobs.lms.course.entity.CourseStatus;
 import lombok.Builder;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -19,6 +20,8 @@ public class CourseResponseDTO {
     private CourseLevel level;
     private CourseStatus status;
     private Integer durationHours;
+    private LocalDate startDate;
+    private LocalDate endDate;
     private Boolean active;
     private LocalDateTime createdAt;
     private Double price;

@@ -2,10 +2,7 @@ package com.vidhuratech.jobs.user.controller;
 
 import com.vidhuratech.jobs.common.service.EmailService;
 import com.vidhuratech.jobs.common.service.OTPEmailTemplateService;
-import com.vidhuratech.jobs.user.dto.AuthResponse;
-import com.vidhuratech.jobs.user.dto.LoginRequest;
-import com.vidhuratech.jobs.user.dto.RegisterRequest;
-import com.vidhuratech.jobs.user.dto.UpdateProfileRequest;
+import com.vidhuratech.jobs.user.dto.*;
 import com.vidhuratech.jobs.user.entity.PasswordResetToken;
 import com.vidhuratech.jobs.user.entity.User;
 import com.vidhuratech.jobs.user.repository.PasswordResetTokenRepository;
@@ -20,6 +17,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -221,15 +219,16 @@ public class AuthController {
         User user = userRepo.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        return ResponseEntity.ok(Map.of(
-                "id", user.getId(),
-                "name", user.getName(),
-                "email", user.getEmail(),
-                "phone", user.getPhone() == null ? "" : user.getPhone(),
-                "role", user.getRole(),
-                "active", user.getActive(),
-                "firstLogin", user.getFirstLogin()
-        ));
+        Map<String, Object> body = new HashMap<>();
+        body.put("id", user.getId());
+        body.put("name", user.getName() == null ? "" : user.getName());
+        body.put("email", user.getEmail() == null ? "" : user.getEmail());
+        body.put("phone", user.getPhone() == null ? "" : user.getPhone());
+        body.put("role", user.getRole() == null ? "" : user.getRole().name());
+        body.put("active", Boolean.TRUE.equals(user.getActive()));
+        body.put("firstLogin", Boolean.TRUE.equals(user.getFirstLogin()));
+
+        return ResponseEntity.ok(body);
     }
 
     @PutMapping("/me")
@@ -244,20 +243,102 @@ public class AuthController {
         User user = userRepo.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        user.setName(req.getName());
-        user.setPhone(req.getPhone());
+        user.setName(req.getName() == null ? "" : req.getName().trim());
+        user.setPhone(req.getPhone() == null ? "" : req.getPhone().trim());
         user.setUpdatedAt(LocalDateTime.now());
 
         userRepo.save(user);
 
+        Map<String, Object> body = new HashMap<>();
+        body.put("id", user.getId());
+        body.put("name", user.getName() == null ? "" : user.getName());
+        body.put("email", user.getEmail() == null ? "" : user.getEmail());
+        body.put("phone", user.getPhone() == null ? "" : user.getPhone());
+        body.put("role", user.getRole() == null ? "" : user.getRole().name());
+        body.put("active", Boolean.TRUE.equals(user.getActive()));
+        body.put("firstLogin", Boolean.TRUE.equals(user.getFirstLogin()));
+
+        return ResponseEntity.ok(body);
+    }
+
+    @PutMapping("/change-password")
+    public ResponseEntity<?> changePassword(
+            Authentication authentication,
+            @RequestBody ChangePasswordRequest req
+    ) {
+        if (authentication == null || authentication.getName() == null) {
+            return ResponseEntity.status(401).body(Map.of("message", "Unauthorized"));
+        }
+
+        if (req.getCurrentPassword() == null || req.getCurrentPassword().isBlank()) {
+            throw new RuntimeException("CURRENT_PASSWORD_REQUIRED");
+        }
+
+        if (req.getNewPassword() == null || req.getNewPassword().isBlank()) {
+            throw new RuntimeException("NEW_PASSWORD_REQUIRED");
+        }
+
+        if (req.getNewPassword().length() < 6) {
+            throw new RuntimeException("PASSWORD_TOO_SHORT");
+        }
+
+        User user = userRepo.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!passwordEncoder.matches(req.getCurrentPassword(), user.getPassword())) {
+            throw new RuntimeException("CURRENT_PASSWORD_INVALID");
+        }
+
+        if (passwordEncoder.matches(req.getNewPassword(), user.getPassword())) {
+            throw new RuntimeException("PASSWORD_SAME_AS_OLD");
+        }
+
+        user.setPassword(passwordEncoder.encode(req.getNewPassword()));
+        user.setFirstLogin(false);
+        user.setUpdatedAt(LocalDateTime.now());
+
+        userRepo.save(user);
+
+        return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
+    }
+
+    @PostMapping("/verify-password")
+    public ResponseEntity<?> verifyPassword(
+            Authentication authentication,
+            @RequestBody VerifyPasswordRequest req
+    ) {
+        if (authentication == null || authentication.getName() == null) {
+            return ResponseEntity.status(401).body(Map.of("message", "Unauthorized"));
+        }
+
+        if (req.getCurrentPassword() == null || req.getCurrentPassword().isBlank()) {
+            throw new RuntimeException("CURRENT_PASSWORD_REQUIRED");
+        }
+
+        User user = userRepo.findByEmail(authentication.getName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        boolean valid = passwordEncoder.matches(req.getCurrentPassword(), user.getPassword());
+
+        if (!valid) {
+            throw new RuntimeException("CURRENT_PASSWORD_INVALID");
+        }
+
         return ResponseEntity.ok(Map.of(
-                "id", user.getId(),
-                "name", user.getName(),
-                "email", user.getEmail(),
-                "phone", user.getPhone() == null ? "" : user.getPhone(),
-                "role", user.getRole(),
-                "active", user.getActive(),
-                "firstLogin", user.getFirstLogin()
+                "valid", true,
+                "message", "Current password verified"
         ));
+    }
+
+    private Map<String, Object> buildUserProfileResponse(User user) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("id", user.getId());
+        body.put("name", user.getName() == null ? "" : user.getName());
+        body.put("email", user.getEmail() == null ? "" : user.getEmail());
+        body.put("phone", user.getPhone() == null ? "" : user.getPhone());
+        body.put("role", user.getRole() == null ? "" : user.getRole().name());
+        body.put("active", Boolean.TRUE.equals(user.getActive()));
+        body.put("firstLogin", Boolean.TRUE.equals(user.getFirstLogin()));
+        return body;
     }
 }
