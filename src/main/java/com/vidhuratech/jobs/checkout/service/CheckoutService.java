@@ -3,6 +3,7 @@ package com.vidhuratech.jobs.checkout.service;
 import com.razorpay.Order;
 import com.razorpay.RazorpayClient;
 import com.vidhuratech.jobs.checkout.dto.CheckoutRequest;
+import com.vidhuratech.jobs.common.notification.service.ActivityNotificationService;
 import com.vidhuratech.jobs.common.service.EmailService;
 import com.vidhuratech.jobs.invoice.entity.Invoice;
 import com.vidhuratech.jobs.invoice.repository.InvoiceRepository;
@@ -46,6 +47,7 @@ public class CheckoutService {
     private final InvoiceRepository invoiceRepo;
     private final EmailService emailService;
     private final InvoiceEmailTemplateService templateService;
+    private final ActivityNotificationService notificationService;
 
     @Value("${RAZORPAY_KEY_ID}")
     private String razorpayKey;
@@ -174,7 +176,21 @@ public class CheckoutService {
         invoice.setVerifiedAt(LocalDateTime.now());
 
         invoiceRepo.save(invoice);
+        User user = null;
+        notificationService.notifyStudent(
+                user,
+                "Payment successful",
+                "Payment received for " + invoice.getCourse() + ". Invoice: " + invoice.getId(),
+                "PAYMENT_SUCCESS",
+                "/dashboard/student/courses"
+        );
 
+        notificationService.notifyAdmins(
+                "Payment received",
+                invoice.getName() + " paid Rs. " + invoice.getAmount() + " for " + invoice.getCourse(),
+                "PAYMENT_SUCCESS",
+                "/dashboard/admin/invoices"
+        );
         Lead lead = leadRepo.findAllByPhoneOrderByCreatedAtDesc(invoice.getLeadPhone())
                 .stream()
                 .findFirst()
@@ -185,8 +201,6 @@ public class CheckoutService {
 
         Optional<User> existingUser =
                 userRepo.findByEmail(invoice.getEmail());
-
-        User user;
 
         if (existingUser.isPresent()) {
             user = existingUser.get();
@@ -234,6 +248,29 @@ public class CheckoutService {
             enrollment.setEnrolledAt(LocalDateTime.now());
 
             enrollmentRepo.save(enrollment);
+
+            notificationService.notifyStudent(
+                    user,
+                    "Enrollment confirmed",
+                    "You are enrolled in " + batch.getCourse().getTitle() + " - " + batch.getName(),
+                    "ENROLLMENT_CREATED",
+                    "/dashboard/student/courses"
+            );
+
+            notificationService.notifyBatchTrainer(
+                    batch,
+                    "New student enrolled",
+                    user.getName() + " joined your batch: " + batch.getName(),
+                    "STUDENT_JOINED_BATCH",
+                    "/dashboard/trainer/students"
+            );
+
+            notificationService.notifyAdmins(
+                    "New student enrolled",
+                    user.getName() + " enrolled in " + batch.getCourse().getTitle(),
+                    "ENROLLMENT_CREATED",
+                    "/dashboard/admin/admissions"
+            );
         }
 
         // =====================================================

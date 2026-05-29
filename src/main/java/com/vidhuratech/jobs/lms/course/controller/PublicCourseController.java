@@ -4,6 +4,7 @@ import com.vidhuratech.jobs.common.api.ApiResponse;
 import com.vidhuratech.jobs.lms.course.dto.CourseResponseDTO;
 import com.vidhuratech.jobs.lms.course.dto.CourseSearchFilterDTO;
 import com.vidhuratech.jobs.lms.course.entity.CourseStatus;
+import com.vidhuratech.jobs.lms.course.repository.CourseRepository;
 import com.vidhuratech.jobs.lms.course.service.CourseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -17,6 +18,7 @@ import java.util.List;
 public class PublicCourseController {
 
     private final CourseService service;
+    private final CourseRepository courseRepository;
 
     @GetMapping
     public ApiResponse<List<CourseResponseDTO>> getActiveCourses(
@@ -33,6 +35,17 @@ public class PublicCourseController {
         List<CourseResponseDTO> courses = service
                 .search(filter, PageRequest.of(0, 100))
                 .getContent();
+
+        return ApiResponse.<List<CourseResponseDTO>>builder()
+                .success(true)
+                .data(courses)
+                .build();
+    }
+
+
+    @GetMapping("/featured")
+    public ApiResponse<List<CourseResponseDTO>> getFeaturedCourses() {
+        List<CourseResponseDTO> courses = service.getFeaturedCourses();
 
         return ApiResponse.<List<CourseResponseDTO>>builder()
                 .success(true)

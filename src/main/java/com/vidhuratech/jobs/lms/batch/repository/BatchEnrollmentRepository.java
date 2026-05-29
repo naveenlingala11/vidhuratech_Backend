@@ -47,4 +47,16 @@ public interface BatchEnrollmentRepository
     AND be.active = true
 """)
     Long countByBatchId(Long batchId);
+
+    @Query("""
+    SELECT be
+    FROM BatchEnrollment be
+    JOIN FETCH be.student
+    JOIN FETCH be.batch b
+    LEFT JOIN FETCH b.course
+    WHERE b.trainer.email = :email
+    AND be.active = true
+    ORDER BY b.id DESC, be.id DESC
+""")
+    List<BatchEnrollment> findActiveStudentsByTrainerEmail(String email);
 }

@@ -46,13 +46,15 @@ public class SecurityConfig {
                                 "/api/auth/resend-link",
                                 "/api/auth/validate-token",
                                 "/api/public/**",
+                                "/uploads/**",
+                                "/api/public/practice/**",
                                 "/api/zoho/**",
                                 "/public/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html"
                         ).permitAll()
-
+                        .requestMatchers(HttpMethod.GET, "/api/questions").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/auth/me").authenticated()
 
@@ -61,7 +63,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/access/**").permitAll()
                         .requestMatchers("/api/leads/save").permitAll()
                         .requestMatchers("/api/lms/batches/course/*/active").permitAll()
-
+                        .requestMatchers("/api/notifications/**").authenticated()
                         .requestMatchers("/api/leads/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
                         .requestMatchers("/api/super-admin/**").hasAnyRole("SUPER_ADMIN", "ADMIN")
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "SUPER_ADMIN")

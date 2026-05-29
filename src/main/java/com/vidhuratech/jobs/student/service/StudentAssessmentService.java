@@ -88,6 +88,15 @@ public class StudentAssessmentService {
                                         "Assessment not found"
                                 ));
 
+        User student =
+                userRepository.findByEmail(
+                        securityUtils.getCurrentUserEmail()
+                ).orElseThrow(() ->
+                        new RuntimeException("Student not found")
+                );
+
+        verifyStudentHasAssessmentAccess(student, assessment);
+
         Map<String, Object> map =
                 new HashMap<>();
 
@@ -141,11 +150,6 @@ public class StudentAssessmentService {
                             );
 
                             qm.put(
-                                    "correctAnswer",
-                                    q.getCorrectAnswer()
-                            );
-
-                            qm.put(
                                     "options",
                                     Map.of(
                                             "A",
@@ -182,12 +186,14 @@ public class StudentAssessmentService {
                         ));
 
         Assessment assessment =
-                assessmentRepository.findById(
+                assessmentRepository.findDetailedAssessment(
                         assessmentId
                 ).orElseThrow(() ->
                         new RuntimeException(
                                 "Assessment not found"
                         ));
+
+        verifyStudentHasAssessmentAccess(student, assessment);
 
         Object rawAnswers =
                 payload.get("answers");
@@ -418,5 +424,28 @@ public class StudentAssessmentService {
         );
 
         return map;
+    }
+
+    private void verifyStudentHasAssessmentAccess(
+            User student,
+            Assessment assessment
+    ) {
+        if (assessment.getBatch() == null) {
+            throw new RuntimeException("Access denied");
+        }
+
+        boolean enrolled =
+                batchEnrollmentRepository
+                        .findActiveByStudentEmail(student.getEmail())
+                        .stream()
+                        .anyMatch(enrollment ->
+                                enrollment.getBatch() != null
+                                        && enrollment.getBatch().getId()
+                                        .equals(assessment.getBatch().getId())
+                        );
+
+        if (!enrolled) {
+            throw new RuntimeException("Access denied");
+        }
     }
 }

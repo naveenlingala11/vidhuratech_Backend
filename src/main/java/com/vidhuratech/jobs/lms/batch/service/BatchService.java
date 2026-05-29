@@ -34,4 +34,6 @@ public interface BatchService {
             Long sessionId,
             BatchSessionRequestDTO dto
     );
+
+    List<?> getTrainerBatchesLite();
 }

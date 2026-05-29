@@ -4,6 +4,7 @@ import com.vidhuratech.jobs.prep.entity.InterviewQuestion;
 import com.vidhuratech.jobs.prep.service.InterviewQuestionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -30,6 +31,7 @@ public class InterviewQuestionController {
     }
 
     @PostMapping("/bulk")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'TRAINER')")
     public String uploadQuestions(@RequestBody List<InterviewQuestion> questions) {
 
         service.saveAll(questions);

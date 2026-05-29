@@ -1,5 +1,6 @@
 package com.vidhuratech.jobs.lms.course.entity;
 
+import com.vidhuratech.jobs.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -70,4 +71,20 @@ public class Course {
 
     @Column(columnDefinition = "TEXT")
     private String metadataJson;
+
+    @Builder.Default
+    private Boolean featuredOnHome = false;
+
+    @Builder.Default
+    private Integer featuredRank = 100;
+
+    @Builder.Default
+    private Boolean autoMonthlyBatchEnabled = false;
+
+    @Builder.Default
+    private Integer monthlyBatchDurationMonths = 3;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "default_trainer_id")
+    private User defaultTrainer;
 }

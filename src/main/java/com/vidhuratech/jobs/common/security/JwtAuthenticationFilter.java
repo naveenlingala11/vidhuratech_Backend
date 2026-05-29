@@ -6,6 +6,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -13,6 +15,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -30,7 +33,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String path = request.getServletPath();
 
-        if (isPublicAuthPath(path)) {
+        if (isPublicPath(path)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -54,11 +57,30 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
+            List<GrantedAuthority> authorities = userDetails.getAuthorities()
+                    .stream()
+                    .map(authority -> {
+                        String role = authority.getAuthority();
+
+                        if (role == null || role.isBlank()) {
+                            return null;
+                        }
+
+                        if (!role.startsWith("ROLE_")) {
+                            role = "ROLE_" + role;
+                        }
+
+                        return new SimpleGrantedAuthority(role);
+                    })
+                    .filter(authority -> authority != null)
+                    .map(authority -> (GrantedAuthority) authority)
+                    .toList();
+
             UsernamePasswordAuthenticationToken authToken =
                     new UsernamePasswordAuthenticationToken(
                             userDetails,
                             null,
-                            userDetails.getAuthorities()
+                            authorities
                     );
 
             authToken.setDetails(
@@ -71,7 +93,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private boolean isPublicAuthPath(String path) {
+    private boolean isPublicPath(String path) {
         return path.equals("/api/auth/register")
                 || path.equals("/api/auth/login")
                 || path.equals("/api/auth/set-password")
@@ -80,6 +102,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 || path.equals("/api/auth/register/init")
                 || path.equals("/api/auth/register/verify")
                 || path.equals("/api/auth/resend-link")
-                || path.equals("/api/auth/validate-token");
+                || path.equals("/api/auth/validate-token")
+                || path.startsWith("/api/public/")
+                || path.startsWith("/uploads/")
+                || path.startsWith("/public/")
+                || path.startsWith("/v3/api-docs/")
+                || path.startsWith("/swagger-ui/")
+                || path.equals("/swagger-ui.html");
     }
 }

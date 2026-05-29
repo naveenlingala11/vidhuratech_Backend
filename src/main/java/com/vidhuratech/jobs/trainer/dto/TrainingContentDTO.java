@@ -18,6 +18,7 @@ public class TrainingContentDTO {
     private String fileType;
     private LocalDateTime createdAt;
     private String jsonData;
+    private String links;
 
     public static TrainingContentDTO from(TrainingContent content) {
         return TrainingContentDTO.builder()
@@ -30,6 +31,7 @@ public class TrainingContentDTO {
                 .fileType(content.getFileType())
                 .createdAt(content.getCreatedAt())
                 .jsonData(content.getJsonData())
+                .links(content.getLinks())
                 .build();
     }
 }
