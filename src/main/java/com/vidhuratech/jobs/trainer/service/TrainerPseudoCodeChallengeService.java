@@ -1,5 +1,6 @@
 package com.vidhuratech.jobs.trainer.service;
 
+import com.vidhuratech.jobs.common.notification.service.ActivityNotificationService;
 import com.vidhuratech.jobs.common.security.SecurityUtils;
 import com.vidhuratech.jobs.lms.batch.repository.BatchRepository;
 import com.vidhuratech.jobs.trainer.entity.*;
@@ -20,6 +21,7 @@ public class TrainerPseudoCodeChallengeService {
     private final PseudoCodeAttemptRepository attemptRepository;
     private final BatchRepository batchRepository;
     private final SecurityUtils securityUtils;
+    private final ActivityNotificationService notificationService;
 
     @Transactional
     public Map<String, Object> createChallenge(Map<String, Object> payload) {
@@ -69,6 +71,10 @@ public class TrainerPseudoCodeChallengeService {
                 .challengeGroupId(groupId)
                 .challengeGroupTitle(groupTitle)
                 .companyName(companyName)
+                .skill(String.valueOf(payload.getOrDefault("skill", "Coding")))
+                .publicVisible(false)
+                .publicAccessLevel("LEAD_REQUIRED")
+                .publicAttemptLimit(1)
                 .build();
 
         Object rawRules = payload.getOrDefault("rules", List.of());
@@ -111,6 +117,13 @@ public class TrainerPseudoCodeChallengeService {
         }
 
         PseudoCodeChallenge saved = challengeRepository.save(challenge);
+
+        notificationService.notifyAdmins(
+                "New coding challenge posted",
+                "Trainer posted coding challenge: " + saved.getTitle(),
+                "CHALLENGE_CREATED",
+                "/dashboard/admin/public-practice"
+        );
 
         return Map.of(
                 "challengeId", saved.getId(),
@@ -168,7 +181,13 @@ public class TrainerPseudoCodeChallengeService {
                         payload.getOrDefault("passPercentage", 40)
                 ))
         );
+         challenge.setCompanyName(
+                 String.valueOf(payload.getOrDefault("companyName", challenge.getCompanyName()))
+         );
 
+         challenge.setSkill(
+                 String.valueOf(payload.getOrDefault("skill", challenge.getSkill()))
+         );
         // clear old rules
         challenge.getRules().clear();
 
@@ -216,6 +235,12 @@ public class TrainerPseudoCodeChallengeService {
         }
 
         PseudoCodeChallenge updated = challengeRepository.save(challenge);
+         notificationService.notifyAdmins(
+                 "Coding challenge updated",
+                 "Trainer updated challenge: " + updated.getTitle(),
+                 "CHALLENGE_UPDATED",
+                 "/dashboard/admin/public-practice"
+         );
 
         return Map.of(
                 "challengeId", updated.getId(),
@@ -261,7 +286,12 @@ public class TrainerPseudoCodeChallengeService {
                 );
             }
         }
-
+        notificationService.notifyAdmins(
+                "Bulk challenges uploaded",
+                successCount + " coding challenges uploaded under " + groupTitle,
+                "CHALLENGE_BULK_CREATED",
+                "/dashboard/admin/public-practice"
+        );
         return Map.of(
                 "challengeGroupId", groupId,
                 "challengeGroupTitle", groupTitle,
@@ -338,6 +368,12 @@ public class TrainerPseudoCodeChallengeService {
         }
 
         challengeRepository.delete(challenge);
+        notificationService.notifyAdmins(
+                "Coding challenge deleted",
+                "Trainer deleted challenge: " + challenge.getTitle(),
+                "CHALLENGE_DELETED",
+                "/dashboard/admin/public-practice"
+        );
     }
 
     private Map<String, Object> mapChallengeListItem(PseudoCodeChallenge challenge) {
@@ -362,7 +398,11 @@ public class TrainerPseudoCodeChallengeService {
         map.put("challengeGroupId", challenge.getChallengeGroupId() == null ? "LEGACY-" + challenge.getId() : challenge.getChallengeGroupId());
         map.put("challengeGroupTitle", challenge.getChallengeGroupTitle() == null ? challenge.getTitle() : challenge.getChallengeGroupTitle());
         map.put("companyName", challenge.getCompanyName() == null ? "" : challenge.getCompanyName());
-
+        map.put("skill", challenge.getSkill() == null ? "Coding" : challenge.getSkill());
+        map.put("publicVisible", Boolean.TRUE.equals(challenge.getPublicVisible()));
+        map.put("publicAccessLevel", challenge.getPublicAccessLevel());
+        map.put("publicAttemptLimit", challenge.getPublicAttemptLimit());
+        map.put("publishedAt", challenge.getPublishedAt());
         return map;
     }
 

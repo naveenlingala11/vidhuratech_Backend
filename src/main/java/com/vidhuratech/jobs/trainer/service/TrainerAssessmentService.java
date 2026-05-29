@@ -1,5 +1,6 @@
 package com.vidhuratech.jobs.trainer.service;
 
+import com.vidhuratech.jobs.common.notification.service.ActivityNotificationService;
 import com.vidhuratech.jobs.common.security.SecurityUtils;
 import com.vidhuratech.jobs.lms.batch.entity.Batch;
 import com.vidhuratech.jobs.lms.batch.repository.BatchRepository;
@@ -26,6 +27,7 @@ public class TrainerAssessmentService {
     private final BatchRepository batchRepository;
     private final SecurityUtils securityUtils;
     private final AssessmentAnswerRepository answerRepository;
+    private final ActivityNotificationService notificationService;
 
     @Transactional
     public Map<String, Object> createAssessment(
@@ -34,10 +36,14 @@ public class TrainerAssessmentService {
         try {
             Long batchId = Long.valueOf(String.valueOf(payload.get("batchId")));
 
+            String email = securityUtils.getCurrentUserEmail();
+
             Batch batch = batchRepository
-                    .findById(batchId)
+                    .findByIdAndTrainerEmail(batchId, email)
                     .orElseThrow(() ->
-                            new RuntimeException("Batch not found"));
+                            new RuntimeException(
+                                    "Access denied. You can create assessments only for your assigned batches."
+                            ));
 
             Assessment assessment = Assessment.builder()
                     .title(String.valueOf(payload.get("title")))
@@ -53,8 +59,26 @@ public class TrainerAssessmentService {
                     .batch(batch)
                     .trainer(batch.getTrainer())
                     .active(true)
+                    .companyName(String.valueOf(payload.getOrDefault("companyName", "General")))
+                    .skill(String.valueOf(payload.getOrDefault("skill", "Placement Readiness")))
+                    .publicVisible(false)
+                    .publicAccessLevel("LEAD_REQUIRED")
+                    .publicAttemptLimit(1)
                     .build();
+            notificationService.notifyAdmins(
+                    "New assessment posted",
+                    "Trainer posted assessment: " + assessment.getTitle(),
+                    "ASSESSMENT_CREATED",
+                    "/dashboard/admin/public-practice"
+            );
 
+            notificationService.notifyBatchStudents(
+                    assessment.getBatch().getEnrollments(),
+                    "New assessment assigned",
+                    "New assessment added: " + assessment.getTitle(),
+                    "ASSESSMENT_ASSIGNED",
+                    "/dashboard/student/assessments"
+            );
             assessment = assessmentRepository.save(assessment);
 
             Object rawQuestions = payload.get("questions");
@@ -89,6 +113,11 @@ public class TrainerAssessmentService {
                                 .optionD(String.valueOf(options.get("D")))
                                 .correctAnswer(String.valueOf(q.get("correctAnswer")).toUpperCase())
                                 .marks(Integer.valueOf(String.valueOf(q.get("marks"))))
+                                .explanation(
+                                        q.get("explanation") == null
+                                                ? ""
+                                                : String.valueOf(q.get("explanation"))
+                                )
                                 .build();
 
                 assessment.getQuestions().add(question);
@@ -163,6 +192,12 @@ public class TrainerAssessmentService {
         map.put("durationMinutes", assessment.getDurationMinutes() == null ? 0 : assessment.getDurationMinutes());
         map.put("active", Boolean.TRUE.equals(assessment.getActive()));
         map.put("createdAt", assessment.getStartTime());
+        map.put("companyName", assessment.getCompanyName() == null ? "General" : assessment.getCompanyName());
+        map.put("skill", assessment.getSkill() == null ? "Placement Readiness" : assessment.getSkill());
+        map.put("publicVisible", Boolean.TRUE.equals(assessment.getPublicVisible()));
+        map.put("publicAccessLevel", assessment.getPublicAccessLevel());
+        map.put("publicAttemptLimit", assessment.getPublicAttemptLimit());
+        map.put("publishedAt", assessment.getPublishedAt());
 
         if (assessment.getBatch() != null) {
             map.put("batchId", assessment.getBatch().getId());
@@ -281,7 +316,12 @@ public class TrainerAssessmentService {
         if (assessment.getTrainer() == null || !email.equals(assessment.getTrainer().getEmail())) {
             throw new RuntimeException("Access denied");
         }
-
+        notificationService.notifyAdmins(
+                "Assessment deleted",
+                "Trainer deleted assessment: " + assessment.getTitle(),
+                "ASSESSMENT_DELETED",
+                "/dashboard/admin/public-practice"
+        );
         assessmentRepository.delete(assessment);
     }
 }

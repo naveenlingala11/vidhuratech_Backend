@@ -1,9 +1,14 @@
 package com.vidhuratech.jobs.trainer.service;
 
+import com.vidhuratech.jobs.common.notification.service.ActivityNotificationService;
 import com.vidhuratech.jobs.dashboard.dto.DashboardStatsResponse;
+import com.vidhuratech.jobs.lms.batch.entity.Batch;
 import com.vidhuratech.jobs.lms.batch.repository.BatchEnrollmentRepository;
 import com.vidhuratech.jobs.lms.batch.repository.BatchRepository;
 import com.vidhuratech.jobs.common.security.SecurityUtils;
+import com.vidhuratech.jobs.lms.course.entity.Course;
+import com.vidhuratech.jobs.lms.course.entity.CourseTrainerAssignment;
+import com.vidhuratech.jobs.lms.course.repository.CourseTrainerAssignmentRepository;
 import com.vidhuratech.jobs.trainer.dto.TrainingContentDTO;
 import com.vidhuratech.jobs.trainer.entity.*;
 import com.vidhuratech.jobs.trainer.repository.*;
@@ -26,10 +31,11 @@ public class TrainerDashboardService {
     private final SecurityUtils securityUtils;
     private final ObjectMapper objectMapper;
     private final TrainerWorkflowService workflowService;
-    private final TrainingWorkItemRepository workItemRepository;
+    private final ActivityNotificationService notificationService;
     private final TrainingSubmissionRepository submissionRepository;
     private final MockInterviewRequestRepository mockRepository;
     private final TrainingContentRepository contentRepository;
+    private final CourseTrainerAssignmentRepository courseTrainerAssignmentRepository;
 
     public DashboardStatsResponse getDashboard() {
         String email = securityUtils.getCurrentUserEmail();
@@ -44,6 +50,7 @@ public class TrainerDashboardService {
         long requestedMocks = mockRepository.countByTrainerEmailAndStatus(email, MockInterviewStatus.REQUESTED);
         long scheduledMocks = mockRepository.countByTrainerEmailAndStatus(email, MockInterviewStatus.SCHEDULED);
         long completedMocks = mockRepository.countByTrainerEmailAndStatus(email, MockInterviewStatus.COMPLETED);
+        List<Map<String, Object>> courses = getAssignedCourses();
 
         Map<String, Object> stats = new HashMap<>();
         stats.put("assignedBatches", assignedBatches);
@@ -59,11 +66,12 @@ public class TrainerDashboardService {
         stats.put("materials", contentRepository.countByTrainerEmailAndType(email, TrainingContentType.MATERIAL));
         stats.put("notes", contentRepository.countByTrainerEmailAndType(email, TrainingContentType.NOTE));
         stats.put("contentUploaded", contentRepository.countByTrainerEmail(email));
+        stats.put("assignedCourses", courses.size());
         Map<String, List<?>> sections = new HashMap<>();
         sections.put("batches", batches);
         sections.put("upcomingSessions", workflowService.getMockInterviewRequests().stream().limit(5).toList());
         sections.put("studentActivities", workflowService.getSubmissions().stream().limit(5).toList());
-
+        sections.put("courses", courses);
         return DashboardStatsResponse.builder()
                 .stats(stats)
                 .sections(sections)
@@ -102,7 +110,7 @@ public class TrainerDashboardService {
         String email = securityUtils.getCurrentUserEmail();
 
         batchRepository.findByIdAndTrainerEmail(batchId, email)
-                .orElseThrow(() -> new RuntimeException("Access denied"));
+                .orElseThrow(() -> new RuntimeException("This batch is not assigned to your trainer account"));
 
         Optional<Curriculum> existing = curriculumRepository.findByBatchId(batchId);
 
@@ -113,13 +121,24 @@ public class TrainerDashboardService {
 
         curriculum.setJsonData(json);
         curriculumRepository.save(curriculum);
+
+        Batch batch = batchRepository.findById(batchId).orElse(null);
+        if (batch != null) {
+            notificationService.notifyBatchStudents(
+                    batch.getEnrollments(),
+                    "Curriculum updated",
+                    "Curriculum updated for " + batch.getName(),
+                    "CURRICULUM_UPDATED",
+                    "/dashboard/student/lms"
+            );
+        }
     }
 
     public Optional<Curriculum> getCurriculum(Long batchId) {
         String email = securityUtils.getCurrentUserEmail();
 
         batchRepository.findByIdAndTrainerEmail(batchId, email)
-                .orElseThrow(() -> new RuntimeException("Access denied"));
+                .orElseThrow(() -> new RuntimeException("This batch is not assigned to your trainer account"));
 
         return curriculumRepository.findByBatchId(batchId);
     }
@@ -136,7 +155,8 @@ public class TrainerDashboardService {
             String title,
             String description,
             MultipartFile file,
-            String jsonData
+            String jsonData,
+            String links
     ) {
         String email = securityUtils.getCurrentUserEmail();
 
@@ -151,6 +171,14 @@ public class TrainerDashboardService {
             }
         }
 
+        if (links != null && !links.isBlank()) {
+            try {
+                objectMapper.readTree(links);
+            } catch (Exception e) {
+                throw new RuntimeException("Invalid links format");
+            }
+        }
+
         try {
             TrainingContent content = TrainingContent.builder()
                     .batchId(batchId)
@@ -159,13 +187,33 @@ public class TrainerDashboardService {
                     .title(title)
                     .description(description)
                     .jsonData(jsonData != null && !jsonData.isBlank() ? jsonData : null)
+                    .links(links != null && !links.isBlank() ? links : null)
                     .fileName(file != null && !file.isEmpty() ? file.getOriginalFilename() : null)
                     .fileType(file != null && !file.isEmpty() ? file.getContentType() : null)
                     .fileData(file != null && !file.isEmpty() ? file.getBytes() : null)
                     .createdAt(LocalDateTime.now())
                     .build();
 
-            return contentRepository.save(content);
+            TrainingContent saved = contentRepository.save(content);
+
+            Batch batch = batchRepository.findById(batchId).orElse(null);
+            if (batch != null) {
+                notificationService.notifyBatchStudents(
+                        batch.getEnrollments(),
+                        "New learning content",
+                        "Trainer uploaded " + saved.getType() + ": " + saved.getTitle(),
+                        "CONTENT_UPLOADED",
+                        "/dashboard/student/lms"
+                );
+
+                notificationService.notifyAdmins(
+                        "Trainer uploaded content",
+                        saved.getTitle() + " uploaded for batch " + batch.getName(),
+                        "CONTENT_UPLOADED",
+                        "/dashboard/admin/batches"
+                );
+            }
+            return saved;
         } catch (Exception e) {
             throw new RuntimeException("Unable to upload content");
         }
@@ -183,5 +231,34 @@ public class TrainerDashboardService {
     public TrainingContent getContentFile(Long id) {
         return contentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Content not found"));
+    }
+
+    public List<Map<String, Object>> getAssignedCourses() {
+        String email = securityUtils.getCurrentUserEmail();
+
+        return courseTrainerAssignmentRepository.findActiveDetailedByTrainerEmail(email)
+                .stream()
+                .map(this::mapAssignedCourse)
+                .toList();
+    }
+
+    private Map<String, Object> mapAssignedCourse(CourseTrainerAssignment assignment) {
+        Course course = assignment.getCourse();
+
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("assignmentId", assignment.getId());
+        map.put("courseId", assignment.getCourseId());
+        map.put("title", course == null ? "Course" : course.getTitle());
+        map.put("code", course == null ? "" : course.getCode());
+        map.put("description", course == null ? "" : course.getDescription());
+        map.put("level", course == null ? "" : course.getLevel());
+        map.put("durationHours", course == null ? 0 : course.getDurationHours());
+        map.put("price", course == null ? 0 : course.getPrice());
+        map.put("status", course == null ? "" : course.getStatus());
+        map.put("thumbnailUrl", course == null ? "" : course.getThumbnailUrl());
+        map.put("assignedAt", assignment.getAssignedAt());
+        map.put("autoMonthlyBatchEnabled", course != null && Boolean.TRUE.equals(course.getAutoMonthlyBatchEnabled()));
+
+        return map;
     }
 }

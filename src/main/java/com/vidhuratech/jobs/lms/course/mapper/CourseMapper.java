@@ -12,7 +12,7 @@ public class CourseMapper {
     public Course toEntity(CourseRequestDTO dto) {
         return Course.builder()
                 .title(dto.getTitle())
-                .code(dto.getCode().toUpperCase())
+                .code(dto.getCode().toUpperCase().trim())
                 .description(dto.getDescription())
                 .thumbnailUrl(dto.getThumbnailUrl())
                 .level(dto.getLevel())
@@ -20,9 +20,17 @@ public class CourseMapper {
                 .startDate(dto.getStartDate())
                 .endDate(dto.getEndDate())
                 .price(dto.getPrice())
-                .metadataJson(dto.getMetadataJson()) // ✅ ADD
+                .metadataJson(dto.getMetadataJson())
                 .status(CourseStatus.DRAFT)
                 .active(true)
+                .featuredOnHome(Boolean.TRUE.equals(dto.getFeaturedOnHome()))
+                .featuredRank(dto.getFeaturedRank() == null ? 100 : dto.getFeaturedRank())
+                .autoMonthlyBatchEnabled(Boolean.TRUE.equals(dto.getAutoMonthlyBatchEnabled()))
+                .monthlyBatchDurationMonths(
+                        dto.getMonthlyBatchDurationMonths() == null
+                                ? 3
+                                : dto.getMonthlyBatchDurationMonths()
+                )
                 .build();
     }
 
@@ -41,12 +49,27 @@ public class CourseMapper {
                 .active(course.getActive())
                 .createdAt(course.getCreatedAt())
                 .price(course.getPrice())
-                .metadataJson(course.getMetadataJson()) // ✅ ADD
+                .metadataJson(course.getMetadataJson())
+                .featuredOnHome(Boolean.TRUE.equals(course.getFeaturedOnHome()))
+                .featuredRank(course.getFeaturedRank())
+                .autoMonthlyBatchEnabled(Boolean.TRUE.equals(course.getAutoMonthlyBatchEnabled()))
+                .monthlyBatchDurationMonths(course.getMonthlyBatchDurationMonths())
+                .defaultTrainerId(
+                        course.getDefaultTrainer() != null
+                                ? course.getDefaultTrainer().getId()
+                                : null
+                )
+                .defaultTrainerName(
+                        course.getDefaultTrainer() != null
+                                ? course.getDefaultTrainer().getName()
+                                : null
+                )
                 .build();
     }
 
     public void updateEntity(Course course, CourseRequestDTO dto) {
         course.setTitle(dto.getTitle());
+        course.setCode(dto.getCode().toUpperCase().trim());
         course.setDescription(dto.getDescription());
         course.setThumbnailUrl(dto.getThumbnailUrl());
         course.setLevel(dto.getLevel());
@@ -54,6 +77,16 @@ public class CourseMapper {
         course.setStartDate(dto.getStartDate());
         course.setEndDate(dto.getEndDate());
         course.setPrice(dto.getPrice());
-        course.setMetadataJson(dto.getMetadataJson()); // ✅ ADD
+        course.setMetadataJson(dto.getMetadataJson());
+
+        course.setFeaturedOnHome(Boolean.TRUE.equals(dto.getFeaturedOnHome()));
+        course.setFeaturedRank(dto.getFeaturedRank() == null ? 100 : dto.getFeaturedRank());
+
+        course.setAutoMonthlyBatchEnabled(Boolean.TRUE.equals(dto.getAutoMonthlyBatchEnabled()));
+        course.setMonthlyBatchDurationMonths(
+                dto.getMonthlyBatchDurationMonths() == null
+                        ? 3
+                        : dto.getMonthlyBatchDurationMonths()
+        );
     }
 }

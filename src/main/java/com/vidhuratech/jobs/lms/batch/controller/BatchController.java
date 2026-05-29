@@ -223,4 +223,13 @@ public class BatchController {
                 )
                 .build();
     }
+
+    @GetMapping("/trainer/my")
+    @PreAuthorize("hasRole('TRAINER')")
+    public ApiResponse<?> getMyTrainerBatches() {
+        return ApiResponse.builder()
+                .success(true)
+                .data(batchService.getTrainerBatchesLite())
+                .build();
+    }
 }

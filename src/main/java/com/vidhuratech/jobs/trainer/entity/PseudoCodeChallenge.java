@@ -20,7 +20,6 @@ public class PseudoCodeChallenge {
     private Long id;
 
     private Long batchId;
-
     private String title;
 
     @Column(columnDefinition = "TEXT")
@@ -36,15 +35,10 @@ public class PseudoCodeChallenge {
     private String outputFormat;
 
     private Integer totalMarks;
-
     private Integer passPercentage;
-
     private Integer durationMinutes;
-
     private String trainerEmail;
-
     private Boolean active;
-
     private LocalDateTime createdAt;
 
     @Builder.Default
@@ -56,8 +50,19 @@ public class PseudoCodeChallenge {
     private List<PseudoCodeTestCase> testCases = new ArrayList<>();
 
     private String challengeGroupId;
-
     private String challengeGroupTitle;
-
     private String companyName;
+    private String skill;
+
+    @Builder.Default
+    private Boolean publicVisible = false;
+
+    @Builder.Default
+    private String publicAccessLevel = "LEAD_REQUIRED";
+
+    @Builder.Default
+    private Integer publicAttemptLimit = 1;
+
+    private LocalDateTime publishedAt;
+    private Long publishedByUserId;
 }

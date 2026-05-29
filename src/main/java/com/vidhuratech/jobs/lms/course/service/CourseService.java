@@ -16,11 +16,17 @@ public interface CourseService {
 
     Page<CourseResponseDTO> search(CourseSearchFilterDTO filter, Pageable pageable);
 
-    void publish(Long id);
-
     void archive(Long id);
 
     void softDelete(Long id);
 
     BulkCourseResponse bulkCreate(List<CourseRequestDTO> list);
+
+    List<CourseResponseDTO> getFeaturedCourses();
+
+    CourseResponseDTO updateThumbnail(Long id, String thumbnailUrl);
+
+    CourseResponseDTO publish(Long id);
+
+    CourseResponseDTO unpublish(Long id);
 }

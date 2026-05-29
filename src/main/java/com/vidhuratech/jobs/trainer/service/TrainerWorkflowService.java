@@ -1,5 +1,6 @@
 package com.vidhuratech.jobs.trainer.service;
 
+import com.vidhuratech.jobs.common.notification.service.ActivityNotificationService;
 import com.vidhuratech.jobs.common.security.SecurityUtils;
 import com.vidhuratech.jobs.lms.batch.entity.Batch;
 import com.vidhuratech.jobs.lms.batch.entity.BatchEnrollment;
@@ -11,6 +12,7 @@ import com.vidhuratech.jobs.trainer.repository.TrainingSubmissionRepository;
 import com.vidhuratech.jobs.trainer.repository.TrainingWorkItemRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -27,14 +29,15 @@ public class TrainerWorkflowService {
     private final TrainingWorkItemRepository workItemRepository;
     private final TrainingSubmissionRepository submissionRepository;
     private final MockInterviewRequestRepository mockRepository;
+    private final ActivityNotificationService notificationService;
 
+
+    @Transactional(readOnly = true)
     public List<Map<String, Object>> getStudents() {
         String email = securityUtils.getCurrentUserEmail();
-        List<Batch> batches = batchRepository.findByTrainerEmail(email);
 
-        return batches.stream()
-                .flatMap(batch -> enrollmentRepository.findByBatchId(batch.getId()).stream())
-                .filter(enrollment -> Boolean.TRUE.equals(enrollment.getActive()))
+        return enrollmentRepository.findActiveStudentsByTrainerEmail(email)
+                .stream()
                 .map(this::mapStudent)
                 .toList();
     }
@@ -77,7 +80,17 @@ public class TrainerWorkflowService {
         request.setTrainerRemarks(remarks);
         request.setUpdatedAt(LocalDateTime.now());
 
-        return mapMock(mockRepository.save(request));
+        MockInterviewRequest saved = mockRepository.save(request);
+
+        notificationService.notifyStudent(
+                saved.getStudent(),
+                "Mock interview " + saved.getStatus(),
+                "Your mock interview status changed to " + saved.getStatus(),
+                "MOCK_INTERVIEW_UPDATED",
+                "/dashboard/student/mock-interviews"
+        );
+
+        return mapMock(saved);
     }
 
     public Map<String, Object> createWorkItem(Map<String, Object> payload) {
@@ -99,7 +112,24 @@ public class TrainerWorkflowService {
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        return mapWorkItem(workItemRepository.save(item));
+        TrainingWorkItem saved = workItemRepository.save(item);
+
+        notificationService.notifyBatchStudents(
+                batch.getEnrollments(),
+                "New " + saved.getType(),
+                saved.getTitle() + " assigned for " + batch.getName(),
+                "WORK_ITEM_CREATED",
+                "/dashboard/student/assignments"
+        );
+
+        notificationService.notifyAdmins(
+                "Trainer assigned work",
+                saved.getTitle() + " assigned for batch " + batch.getName(),
+                "WORK_ITEM_CREATED",
+                "/dashboard/admin/batches"
+        );
+
+        return mapWorkItem(saved);
     }
 
     public List<Map<String, Object>> getWorkItems() {
@@ -130,20 +160,36 @@ public class TrainerWorkflowService {
         submission.setStatus(TrainingSubmissionStatus.REVIEWED);
         submission.setReviewedAt(LocalDateTime.now());
 
-        return mapSubmission(submissionRepository.save(submission));
+        TrainingSubmission saved = submissionRepository.save(submission);
+
+        notificationService.notifyStudent(
+                saved.getStudent(),
+                "Submission reviewed",
+                "Your submission was reviewed: " + saved.getWorkItem().getTitle(),
+                "SUBMISSION_REVIEWED",
+                "/dashboard/student/assignments"
+        );
+
+        return mapSubmission(saved);
     }
 
     private Map<String, Object> mapStudent(BatchEnrollment enrollment) {
-        return Map.of(
-                "id", enrollment.getStudent().getId(),
-                "name", enrollment.getStudent().getName(),
-                "email", enrollment.getStudent().getEmail(),
-                "phone", enrollment.getStudent().getPhone(),
-                "batchId", enrollment.getBatch().getId(),
-                "batch", enrollment.getBatch().getName(),
-                "course", enrollment.getBatch().getCourse().getTitle(),
-                "status", Boolean.TRUE.equals(enrollment.getActive()) ? "Active" : "Inactive"
-        );
+        Map<String, Object> map = new HashMap<>();
+
+        var student = enrollment.getStudent();
+        var batch = enrollment.getBatch();
+        var course = batch != null ? batch.getCourse() : null;
+
+        map.put("id", student != null ? student.getId() : null);
+        map.put("name", student != null && student.getName() != null ? student.getName() : "Student");
+        map.put("email", student != null && student.getEmail() != null ? student.getEmail() : "");
+        map.put("phone", student != null && student.getPhone() != null ? student.getPhone() : "");
+        map.put("batchId", batch != null ? batch.getId() : null);
+        map.put("batch", batch != null && batch.getName() != null ? batch.getName() : "Batch");
+        map.put("course", course != null && course.getTitle() != null ? course.getTitle() : "Course");
+        map.put("status", Boolean.TRUE.equals(enrollment.getActive()) ? "Active" : "Inactive");
+
+        return map;
     }
 
     private Map<String, Object> mapMock(MockInterviewRequest request) {

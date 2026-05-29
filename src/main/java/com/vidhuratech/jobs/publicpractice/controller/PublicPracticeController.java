@@ -16,10 +16,16 @@ public class PublicPracticeController {
     private final PublicPracticeService service;
 
     @GetMapping
-    public ApiResponse<?> getPracticeLibrary() {
+    public ApiResponse<?> getPracticeLibrary(
+            @RequestParam(required = false) String company
+    ) {
+        Object data = company == null || company.isBlank()
+                ? service.getPracticeLibrary()
+                : service.getPracticeLibraryByCompany(company);
+
         return ApiResponse.builder()
                 .success(true)
-                .data(service.getPracticeLibrary())
+                .data(data)
                 .build();
     }
 
@@ -29,7 +35,7 @@ public class PublicPracticeController {
     ) {
         return ApiResponse.builder()
                 .success(true)
-                .message("Lead saved successfully")
+                .message("Registration completed successfully")
                 .data(service.savePracticeLead(payload))
                 .build();
     }
@@ -71,6 +77,17 @@ public class PublicPracticeController {
                 .success(true)
                 .message("Challenge evaluated successfully")
                 .data(service.runPublicChallenge(id, payload))
+                .build();
+    }
+
+    @PostMapping("/access/register")
+    public ApiResponse<?> registerAccess(
+            @RequestBody Map<String, Object> payload
+    ) {
+        return ApiResponse.builder()
+                .success(true)
+                .message("Registration completed successfully")
+                .data(service.registerPracticeAccess(payload))
                 .build();
     }
 }

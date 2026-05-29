@@ -139,12 +139,13 @@ public class TrainerDashboardController {
             @RequestParam String title,
             @RequestParam(required = false) String description,
             @RequestParam(required = false) String jsonData,
+            @RequestParam(required = false) String links,
             @RequestParam(required = false) MultipartFile file
     ) {
         return ApiResponse.builder()
                 .success(true)
                 .message("Content uploaded successfully")
-                .data(service.uploadContent(batchId, type, title, description, file, jsonData))
+                .data(service.uploadContent(batchId, type, title, description, file, jsonData, links))
                 .build();
     }
 
@@ -174,5 +175,14 @@ public class TrainerDashboardController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
                 .contentType(MediaType.parseMediaType(fileType))
                 .body(content.getFileData());
+    }
+
+    @GetMapping("/courses")
+    @PreAuthorize("hasRole('TRAINER')")
+    public ApiResponse<?> getAssignedCourses() {
+        return ApiResponse.builder()
+                .success(true)
+                .data(service.getAssignedCourses())
+                .build();
     }
 }

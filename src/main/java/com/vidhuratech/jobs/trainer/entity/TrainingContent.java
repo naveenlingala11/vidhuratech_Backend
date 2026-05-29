@@ -44,4 +44,7 @@ public class TrainingContent {
 
     @Column(columnDefinition = "TEXT")
     private String jsonData;
+
+    @Column(columnDefinition = "TEXT")
+    private String links;
 }

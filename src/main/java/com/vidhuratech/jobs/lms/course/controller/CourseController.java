@@ -3,6 +3,8 @@ package com.vidhuratech.jobs.lms.course.controller;
 import com.vidhuratech.jobs.common.api.ApiResponse;
 import com.vidhuratech.jobs.lms.course.dto.*;
 import com.vidhuratech.jobs.lms.course.service.CourseService;
+import com.vidhuratech.jobs.lms.course.service.CourseThumbnailStorageService;
+import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
@@ -17,6 +19,7 @@ import java.util.List;
 public class CourseController {
 
     private final CourseService service;
+    private final CourseThumbnailStorageService thumbnailStorageService;
 
     // ================= CREATE =================
     @PostMapping
@@ -93,6 +96,17 @@ public class CourseController {
                 .build();
     }
 
+    // ================= UNPUBLISH ===============
+    @PatchMapping("/{id}/unpublish")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
+    public ApiResponse<CourseResponseDTO> unpublish(@PathVariable Long id) {
+        return ApiResponse.<CourseResponseDTO>builder()
+                .success(true)
+                .message("Course unpublished successfully")
+                .data(service.unpublish(id))
+                .build();
+    }
+
     // ================= ARCHIVE =================
     @PatchMapping("/{id}/archive")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
@@ -114,6 +128,21 @@ public class CourseController {
         return ApiResponse.<Void>builder()
                 .success(true)
                 .message("Course deleted successfully")
+                .build();
+    }
+
+    @PostMapping("/{id}/thumbnail")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','TRAINER')")
+    public ApiResponse<CourseResponseDTO> uploadThumbnail(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file
+    ) {
+        String thumbnailUrl = thumbnailStorageService.store(file);
+
+        return ApiResponse.<CourseResponseDTO>builder()
+                .success(true)
+                .message("Course thumbnail uploaded successfully")
+                .data(service.updateThumbnail(id, thumbnailUrl))
                 .build();
     }
 }

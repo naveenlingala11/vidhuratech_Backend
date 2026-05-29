@@ -1,5 +1,6 @@
 package com.vidhuratech.jobs.lms.batch.service.impl;
 
+import com.vidhuratech.jobs.common.notification.service.ActivityNotificationService;
 import com.vidhuratech.jobs.lms.batch.dto.BatchRequestDTO;
 import com.vidhuratech.jobs.lms.batch.entity.Batch;
 import com.vidhuratech.jobs.lms.batch.repository.BatchEnrollmentRepository;
@@ -27,6 +28,8 @@ public class AdminBatchServiceImpl implements AdminBatchService {
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
     private final BatchEnrollmentRepository enrollmentRepository;
+    private final ActivityNotificationService notificationService;
+
 
     @Override
     public Map<String, Object> getAllBatches(
@@ -92,7 +95,24 @@ public class AdminBatchServiceImpl implements AdminBatchService {
                 .active(true)
                 .build();
 
-        return batchRepository.save(batch);
+        Batch saved = batchRepository.save(batch);
+
+        notificationService.notifyTrainer(
+                trainer,
+                "New batch assigned",
+                "You were assigned to batch: " + saved.getName(),
+                "BATCH_ASSIGNED",
+                "/dashboard/trainer/batches"
+        );
+
+        notificationService.notifyAdmins(
+                "Batch created",
+                saved.getName() + " created for " + course.getTitle(),
+                "BATCH_CREATED",
+                "/dashboard/admin/batches"
+        );
+
+        return saved;
     }
 
     @Override
@@ -113,8 +133,17 @@ public class AdminBatchServiceImpl implements AdminBatchService {
         batch.setEndDate(dto.getEndDate());
         batch.setStatus(dto.getStatus());
 
-        return batchRepository.save(batch);
-    }
+        Batch saved = batchRepository.save(batch);
+
+        notificationService.notifyTrainer(
+                trainer,
+                "Batch updated",
+                "Batch details updated: " + saved.getName(),
+                "BATCH_UPDATED",
+                "/dashboard/trainer/batches"
+        );
+
+        return saved;    }
 
     @Override
     public void deleteBatch(Long id) {

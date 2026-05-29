@@ -1,11 +1,13 @@
 package com.vidhuratech.jobs.invoice.service;
 
+import com.vidhuratech.jobs.common.notification.service.ActivityNotificationService;
 import com.vidhuratech.jobs.invoice.dto.InvoiceCreateRequest;
 import com.vidhuratech.jobs.invoice.dto.MonthlyRevenueDto;
 import com.vidhuratech.jobs.invoice.entity.Invoice;
 import com.vidhuratech.jobs.invoice.entity.InvoiceInstallment;
 import com.vidhuratech.jobs.invoice.repository.InvoiceInstallmentRepository;
 import com.vidhuratech.jobs.invoice.repository.InvoiceRepository;
+import com.vidhuratech.jobs.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -24,6 +26,8 @@ public class InvoiceService {
 
     private final InvoiceRepository repo;
     private final InvoiceInstallmentRepository installmentRepo;
+    private final ActivityNotificationService notificationService;
+    private final UserRepository userRepo;
 
     public Invoice save(InvoiceCreateRequest request) {
 
@@ -54,6 +58,22 @@ public class InvoiceService {
 
             invoice.setInstallmentEnabled(true);
         }
+        userRepo.findByEmail(invoice.getEmail()).ifPresent(student ->
+                notificationService.notifyStudent(
+                        student,
+                        "Invoice updated",
+                        "Your invoice " + invoice.getId() + " status is " + invoice.getPaymentStatus(),
+                        "INVOICE_UPDATED",
+                        "/dashboard/student/courses"
+                )
+        );
+
+        notificationService.notifyAdmins(
+                "Invoice updated",
+                invoice.getName() + " invoice status: " + invoice.getPaymentStatus(),
+                "INVOICE_UPDATED",
+                "/dashboard/admin/invoices"
+        );
 
         return repo.save(invoice);
     }

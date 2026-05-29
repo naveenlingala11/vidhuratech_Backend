@@ -33,4 +33,14 @@ public class CourseRequestDTO {
     private Double price;
 
     private String metadataJson;
+
+    private Boolean featuredOnHome;
+
+    private Integer featuredRank;
+
+    private Boolean autoMonthlyBatchEnabled;
+
+    private Integer monthlyBatchDurationMonths;
+
+    private Long defaultTrainerId;
 }

@@ -2,6 +2,7 @@ package com.vidhuratech.jobs.admission.service;
 
 import com.vidhuratech.jobs.admission.dto.AdmissionResponseDTO;
 import com.vidhuratech.jobs.admission.dto.ManualAdmissionRequest;
+import com.vidhuratech.jobs.common.notification.service.ActivityNotificationService;
 import com.vidhuratech.jobs.invoice.entity.Invoice;
 import com.vidhuratech.jobs.invoice.repository.InvoiceRepository;
 import com.vidhuratech.jobs.leads.entity.Lead;
@@ -36,6 +37,7 @@ public class AdmissionService {
     private final LeadRepository leadRepo;
     private final PasswordService passwordService;
     private final PasswordEncoder passwordEncoder;
+    private final ActivityNotificationService notificationService;
 
     @Transactional
     public AdmissionResponseDTO createManualAdmission(
@@ -192,6 +194,28 @@ public class AdmissionService {
                             .build();
 
             enrollmentRepo.save(enrollment);
+            notificationService.notifyStudent(
+                    user,
+                    "Admission created",
+                    "You were added to " + batch.getCourse().getTitle() + " - " + batch.getName(),
+                    "MANUAL_ADMISSION_CREATED",
+                    "/dashboard/student/courses"
+            );
+
+            notificationService.notifyBatchTrainer(
+                    batch,
+                    "New manual admission",
+                    user.getName() + " was added to your batch: " + batch.getName(),
+                    "STUDENT_JOINED_BATCH",
+                    "/dashboard/trainer/students"
+            );
+
+            notificationService.notifyAdmins(
+                    "Manual admission completed",
+                    user.getName() + " was admitted to " + batch.getCourse().getTitle(),
+                    "MANUAL_ADMISSION_CREATED",
+                    "/dashboard/admin/admissions"
+            );
 
             enrollmentCreated = true;
 
