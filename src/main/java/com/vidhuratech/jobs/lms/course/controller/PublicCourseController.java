@@ -42,23 +42,15 @@ public class PublicCourseController {
                 .build();
     }
 
-
     @GetMapping("/featured")
     public ApiResponse<List<CourseResponseDTO>> getFeaturedCourses() {
-        List<CourseResponseDTO> courses = service.getFeaturedCourses();
+
+        List<CourseResponseDTO> courses =
+                service.getFeaturedCourses();
 
         return ApiResponse.<List<CourseResponseDTO>>builder()
                 .success(true)
                 .data(courses)
-                .build();
-    }
-
-    @GetMapping("/featured")
-    public ApiResponse<List<CourseResponseDTO>> featuredCourses() {
-        return ApiResponse.<List<CourseResponseDTO>>builder()
-                .success(true)
-                .message("Featured courses fetched successfully")
-                .data(service.getFeaturedCourses())
                 .build();
     }
 }
