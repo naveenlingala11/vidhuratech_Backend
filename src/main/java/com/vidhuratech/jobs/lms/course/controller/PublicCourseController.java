@@ -52,4 +52,13 @@ public class PublicCourseController {
                 .data(courses)
                 .build();
     }
+
+    @GetMapping("/featured")
+    public ApiResponse<List<CourseResponseDTO>> featuredCourses() {
+        return ApiResponse.<List<CourseResponseDTO>>builder()
+                .success(true)
+                .message("Featured courses fetched successfully")
+                .data(service.getFeaturedCourses())
+                .build();
+    }
 }
