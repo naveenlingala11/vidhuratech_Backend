@@ -4,6 +4,7 @@ import com.vidhuratech.jobs.lms.batch.entity.Batch;
 import com.vidhuratech.jobs.lms.batch.entity.BatchEnrollment;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
@@ -59,4 +60,11 @@ public interface BatchEnrollmentRepository
     ORDER BY b.id DESC, be.id DESC
 """)
     List<BatchEnrollment> findActiveStudentsByTrainerEmail(String email);
+
+    @Query("""
+    SELECT e.batch.id FROM BatchEnrollment e
+    WHERE e.student.id = :studentId
+    AND e.active = true
+""")
+    List<Long> findActiveBatchIdsByStudentId(@Param("studentId") Long studentId);
 }

@@ -1,42 +1,30 @@
 package com.vidhuratech.jobs.prep.controller;
 
-import com.vidhuratech.jobs.prep.entity.InterviewQuestion;
 import com.vidhuratech.jobs.prep.service.InterviewQuestionService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/questions")
 @CrossOrigin("*")
+@RequiredArgsConstructor
 public class InterviewQuestionController {
 
-    @Autowired
-    private InterviewQuestionService service;
+    private final InterviewQuestionService service;
 
     @GetMapping
-    public Page<InterviewQuestion> getQuestions(
-            @RequestParam String company,
-            @RequestParam String role,
-            @RequestParam(required = false) String search,
-            @RequestParam(required = false) String type,
-            @RequestParam(required = false) String difficulty,
-            @RequestParam(required = false) String topic,
+    public Page<Map<String, Object>> getQuestions(
+            @RequestParam(defaultValue = "") String company,
+            @RequestParam(defaultValue = "") String role,
+            @RequestParam(defaultValue = "") String search,
+            @RequestParam(defaultValue = "") String type,
+            @RequestParam(defaultValue = "") String difficulty,
+            @RequestParam(defaultValue = "") String topic,
             @RequestParam(defaultValue = "0") int page
     ) {
         return service.getQuestions(company, role, search, type, difficulty, topic, page);
     }
-
-    @PostMapping("/bulk")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'TRAINER')")
-    public String uploadQuestions(@RequestBody List<InterviewQuestion> questions) {
-
-        service.saveAll(questions);
-
-        return "Saved Successfully";
-    }
-
 }

@@ -64,6 +64,7 @@ public class StudentPseudoCodeChallengeService {
         map.put("constraintsText", challenge.getConstraintsText());
         map.put("inputFormat", challenge.getInputFormat());
         map.put("outputFormat", challenge.getOutputFormat());
+        map.put("hintText", challenge.getHintText());
 
         map.put(
                 "testCases",

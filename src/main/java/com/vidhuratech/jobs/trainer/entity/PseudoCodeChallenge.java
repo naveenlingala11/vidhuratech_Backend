@@ -65,4 +65,7 @@ public class PseudoCodeChallenge {
 
     private LocalDateTime publishedAt;
     private Long publishedByUserId;
+
+    @Column(columnDefinition = "TEXT")
+    private String hintText;
 }

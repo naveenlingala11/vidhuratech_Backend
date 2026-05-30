@@ -232,4 +232,22 @@ public class BatchController {
                 .data(batchService.getTrainerBatchesLite())
                 .build();
     }
+
+    @GetMapping("/course/{courseId}/upcoming")
+    public ApiResponse<?> getUpcomingBatch(@PathVariable Long courseId) {
+        Batch batch = batchService.getUpcomingBatchByCourse(courseId);
+
+        if (batch == null) {
+            return ApiResponse.success(null);
+        }
+
+        return ApiResponse.success(Map.of(
+                "id", batch.getId(),
+                "name", batch.getName() != null ? batch.getName() : "",
+                "startDate", batch.getStartDate(),
+                "status", batch.getStatus() != null ? batch.getStatus().name() : "UPCOMING",
+                "courseName", batch.getCourse() != null ? batch.getCourse().getTitle() : "",
+                "trainerName", batch.getTrainer() != null ? batch.getTrainer().getName() : ""
+        ));
+    }
 }

@@ -75,6 +75,7 @@ public class TrainerPseudoCodeChallengeService {
                 .publicVisible(false)
                 .publicAccessLevel("LEAD_REQUIRED")
                 .publicAttemptLimit(1)
+                .hintText(String.valueOf(payload.getOrDefault("hintText", "")))
                 .build();
 
         Object rawRules = payload.getOrDefault("rules", List.of());
@@ -188,6 +189,11 @@ public class TrainerPseudoCodeChallengeService {
          challenge.setSkill(
                  String.valueOf(payload.getOrDefault("skill", challenge.getSkill()))
          );
+
+         challenge.setHintText(
+                 String.valueOf(payload.getOrDefault("hintText", ""))
+         );
+
         // clear old rules
         challenge.getRules().clear();
 
@@ -403,6 +409,7 @@ public class TrainerPseudoCodeChallengeService {
         map.put("publicAccessLevel", challenge.getPublicAccessLevel());
         map.put("publicAttemptLimit", challenge.getPublicAttemptLimit());
         map.put("publishedAt", challenge.getPublishedAt());
+        map.put("hintText", challenge.getHintText());
         return map;
     }
 
@@ -412,7 +419,7 @@ public class TrainerPseudoCodeChallengeService {
         map.put("constraintsText", challenge.getConstraintsText());
         map.put("inputFormat", challenge.getInputFormat());
         map.put("outputFormat", challenge.getOutputFormat());
-
+        map.put("hintText", challenge.getHintText());
         map.put("rules", challenge.getRules().stream().map(rule -> {
             Map<String, Object> r = new LinkedHashMap<>();
             r.put("id", rule.getId());
@@ -488,7 +495,7 @@ public class TrainerPseudoCodeChallengeService {
         map.put("allTestsPassed", Boolean.TRUE.equals(attempt.getAllTestsPassed()));
         map.put("compileError", attempt.getCompileError());
         map.put("submittedAt", attempt.getSubmittedAt());
-
+        map.put("hintText", challenge.getHintText());
         map.put(
                 "testResults",
                 attempt.getOutputs().stream().map(output -> {

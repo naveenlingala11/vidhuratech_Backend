@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/notifications")
 @RequiredArgsConstructor
@@ -31,10 +33,30 @@ public class ActivityNotificationController {
                 .build();
     }
 
+    @GetMapping("/preferences")
+    @PreAuthorize("isAuthenticated()")
+    public ApiResponse<?> preferences() {
+        return ApiResponse.builder()
+                .success(true)
+                .data(service.myPreferences())
+                .build();
+    }
+
+    @PutMapping("/preferences")
+    @PreAuthorize("isAuthenticated()")
+    public ApiResponse<?> updatePreferences(@RequestBody Map<String, Boolean> body) {
+        return ApiResponse.builder()
+                .success(true)
+                .message("Notification preferences updated")
+                .data(service.updatePreferences(body.get("notificationsEnabled")))
+                .build();
+    }
+
     @PatchMapping("/{id}/read")
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<?> markRead(@PathVariable Long id) {
         service.markRead(id);
+
         return ApiResponse.builder()
                 .success(true)
                 .message("Notification marked as read")

@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,10 +32,11 @@ public class ActivityNotificationService {
     private String frontendUrl;
 
     public List<Map<String, Object>> myNotifications() {
-        Long userId = securityUtils.getCurrentUserId();
+        User user = getCurrentUser();
 
-        User user = userRepo.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        if (!isNotificationsEnabled(user)) {
+            return Collections.emptyList();
+        }
 
         return repo.findForUser(user.getId(), user.getRole())
                 .stream()
@@ -43,16 +45,31 @@ public class ActivityNotificationService {
     }
 
     public long unreadCount() {
-        Long userId = securityUtils.getCurrentUserId();
+        User user = getCurrentUser();
 
-        User user = userRepo.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        if (!isNotificationsEnabled(user)) {
+            return 0;
+        }
 
         return repo.countUnread(user.getId(), user.getRole());
     }
 
+    public Map<String, Object> myPreferences() {
+        User user = getCurrentUser();
+        return Map.of("notificationsEnabled", isNotificationsEnabled(user));
+    }
+
+    public Map<String, Object> updatePreferences(Boolean enabled) {
+        User user = getCurrentUser();
+        user.setNotificationsEnabled(Boolean.TRUE.equals(enabled));
+        user.setUpdatedAt(LocalDateTime.now());
+        userRepo.save(user);
+
+        return myPreferences();
+    }
+
     public void notifyUser(User user, String title, String message, String type, String link) {
-        if (user == null) {
+        if (user == null || !isNotificationsEnabled(user)) {
             return;
         }
 
@@ -91,18 +108,10 @@ public class ActivityNotificationService {
     }
 
     public void notifyTrainer(User trainer, String title, String message, String type, String link) {
-        if (trainer == null) {
-            return;
-        }
-
         notifyUser(trainer, title, message, type, link);
     }
 
     public void notifyStudent(User student, String title, String message, String type, String link) {
-        if (student == null) {
-            return;
-        }
-
         notifyUser(student, title, message, type, link);
     }
 
@@ -135,11 +144,43 @@ public class ActivityNotificationService {
     }
 
     public void markRead(Long id) {
+        User user = getCurrentUser();
+
         ActivityNotification notification = repo.findById(id)
                 .orElseThrow(() -> new RuntimeException("Notification not found"));
 
+        if (!canAccessNotification(user, notification)) {
+            throw new RuntimeException("Notification not found");
+        }
+
         notification.setRead(true);
         repo.save(notification);
+    }
+
+    private User getCurrentUser() {
+        Long userId = securityUtils.getCurrentUserId();
+
+        return userRepo.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+    }
+
+    private boolean isNotificationsEnabled(User user) {
+        return user == null || !Boolean.FALSE.equals(user.getNotificationsEnabled());
+    }
+
+    private boolean canAccessNotification(User user, ActivityNotification notification) {
+        if (user == null || notification == null) {
+            return false;
+        }
+
+        if (notification.getRecipientUser() != null
+                && notification.getRecipientUser().getId() != null
+                && notification.getRecipientUser().getId().equals(user.getId())) {
+            return true;
+        }
+
+        return notification.getRecipientRole() != null
+                && notification.getRecipientRole().equals(user.getRole());
     }
 
     private void sendEmail(String to, String title, String message, String link) {
@@ -154,10 +195,6 @@ public class ActivityNotificationService {
         String html = """
                 <!DOCTYPE html>
                 <html>
-                <head>
-                  <meta charset="UTF-8" />
-                  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-                </head>
                 <body style="margin:0;padding:0;background:#f4f7fb;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
                   <table width="100%%" cellpadding="0" cellspacing="0" style="background:#f4f7fb;padding:32px 12px;">
                     <tr>
@@ -174,7 +211,6 @@ public class ActivityNotificationService {
                               </h1>
                             </td>
                           </tr>
-
                           <tr>
                             <td style="padding:30px;">
                               <div style="padding:20px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:18px;margin-bottom:22px;">
@@ -204,21 +240,6 @@ public class ActivityNotificationService {
                               </div>
                             </td>
                           </tr>
-
-                          <tr>
-                            <td style="padding:22px 30px;background:#f8fafc;border-top:1px solid #e5e7eb;">
-                              <p style="margin:0;font-size:14px;font-weight:900;color:#0f172a;">
-                                Vidhura Tech
-                              </p>
-                              <p style="margin:6px 0 0;font-size:13px;line-height:1.5;color:#64748b;">
-                                Software training, live batches, projects, career support, and student learning platform.
-                              </p>
-                              <p style="margin:14px 0 0;font-size:12px;color:#94a3b8;">
-                                This is an automated notification. Please do not reply to this email.
-                              </p>
-                            </td>
-                          </tr>
-
                         </table>
                       </td>
                     </tr>
