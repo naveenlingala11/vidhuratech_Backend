@@ -299,6 +299,7 @@ public class PublicPracticeService {
         map.put("constraintsText", safe(challenge.getConstraintsText()));
         map.put("inputFormat", safe(challenge.getInputFormat()));
         map.put("outputFormat", safe(challenge.getOutputFormat()));
+        map.put("hintText", safe(challenge.getHintText()));
         map.put("supportedLanguages", SUPPORTED_LANGUAGES);
 
         map.put(

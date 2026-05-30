@@ -282,6 +282,16 @@ public class BatchServiceImpl implements BatchService {
     }
 
     @Override
+    public Batch getUpcomingBatchByCourse(Long courseId) {
+        return batchRepository
+                .findTopByCourseIdAndStatusAndActiveTrueOrderByStartDateAsc(
+                        courseId,
+                        BatchStatus.UPCOMING
+                )
+                .orElse(null);
+    }
+
+    @Override
     public BatchSessionResponseDTO updateSession(
             Long batchId,
             Long sessionId,

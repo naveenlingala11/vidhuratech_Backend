@@ -40,4 +40,7 @@ public class User {
     private LocalDateTime updatedAt;
 
     private Boolean firstLogin = true;
+
+    @Column(nullable = false)
+    private Boolean notificationsEnabled = true;
 }

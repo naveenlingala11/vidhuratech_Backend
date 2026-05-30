@@ -36,4 +36,7 @@ public interface BatchService {
     );
 
     List<?> getTrainerBatchesLite();
+
+    Batch getUpcomingBatchByCourse(Long courseId);
+
 }
