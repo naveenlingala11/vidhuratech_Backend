@@ -2,9 +2,11 @@ package com.vidhuratech.jobs.lms.batch.repository;
 
 import com.vidhuratech.jobs.lms.batch.entity.Batch;
 import com.vidhuratech.jobs.lms.batch.entity.BatchStatus;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -43,4 +45,12 @@ public interface BatchRepository extends JpaRepository<Batch, Long>, JpaSpecific
          Long courseId,
          BatchStatus status
  );
+ @Query("""
+    SELECT b FROM Batch b
+    WHERE b.course.id = :courseId
+    AND b.active = true
+    AND b.startDate >= CURRENT_DATE
+    ORDER BY b.startDate ASC
+""")
+ List<Batch> findUpcomingByCourseId(@Param("courseId") Long courseId, Pageable pageable);
 }
