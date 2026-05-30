@@ -241,7 +241,17 @@ public class BatchController {
         return batchRepository.findUpcomingByCourseId(courseId, PageRequest.of(0, 1))
                 .stream()
                 .findFirst()
-                .map(batch -> ApiResponse.success(batch))
+                .map(batch -> ApiResponse.success(
+                        BatchResponseDTO.builder()
+                                .id(batch.getId())
+                                .name(batch.getName())
+                                .courseName(batch.getCourse() != null ? batch.getCourse().getTitle() : "")
+                                .trainerName(batch.getTrainer() != null ? batch.getTrainer().getName() : "")
+                                .startDate(batch.getStartDate())
+                                .endDate(batch.getEndDate())
+                                .status(batch.getStatus() != null ? batch.getStatus().name() : null)
+                                .build()
+                ))
                 .orElseGet(() -> ApiResponse.success(null));
     }
 }

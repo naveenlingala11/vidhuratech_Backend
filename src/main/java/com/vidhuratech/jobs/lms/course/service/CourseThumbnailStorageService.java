@@ -1,5 +1,6 @@
 package com.vidhuratech.jobs.lms.course.service;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -12,6 +13,9 @@ import java.util.UUID;
 
 @Service
 public class CourseThumbnailStorageService {
+
+    @Value("${app.upload-dir:uploads}")
+    private String uploadDir;
 
     private static final long MAX_SIZE = 4 * 1024 * 1024;
 
@@ -44,7 +48,7 @@ public class CourseThumbnailStorageService {
 
             String fileName = UUID.randomUUID() + "_" + originalName;
 
-            Path uploadPath = Paths.get("uploads/course-thumbnails");
+            Path uploadPath = Paths.get(uploadDir, "course-thumbnails");
             Files.createDirectories(uploadPath);
 
             Path filePath = uploadPath.resolve(fileName);
@@ -55,8 +59,7 @@ public class CourseThumbnailStorageService {
                     StandardCopyOption.REPLACE_EXISTING
             );
 
-            return "/uploads/course-thumbnails/" + fileName;
-
+            return "/course-thumbnails/" + fileName;
         } catch (Exception e) {
             throw new RuntimeException(e.getMessage() == null ? "Thumbnail upload failed" : e.getMessage());
         }
