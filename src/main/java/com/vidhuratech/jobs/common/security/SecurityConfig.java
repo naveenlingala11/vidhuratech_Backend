@@ -63,6 +63,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/access/**").permitAll()
                         .requestMatchers("/api/leads/save").permitAll()
                         .requestMatchers("/api/lms/batches/course/*/active").permitAll()
+                        .requestMatchers("/course-thumbnails/**", "/api/lms/batches/course/*/upcoming").permitAll()
                         .requestMatchers("/api/notifications/**").authenticated()
                         .requestMatchers("/api/leads/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
                         .requestMatchers("/api/super-admin/**").hasAnyRole("SUPER_ADMIN", "ADMIN")

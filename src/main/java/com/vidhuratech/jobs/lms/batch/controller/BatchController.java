@@ -5,8 +5,10 @@ import com.vidhuratech.jobs.common.security.SecurityUtils;
 import com.vidhuratech.jobs.lms.batch.dto.*;
 import com.vidhuratech.jobs.lms.batch.entity.Batch;
 import com.vidhuratech.jobs.lms.batch.repository.BatchEnrollmentRepository;
+import com.vidhuratech.jobs.lms.batch.repository.BatchRepository;
 import com.vidhuratech.jobs.lms.batch.service.BatchService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,6 +22,7 @@ public class BatchController {
     private final BatchService batchService;
     private final BatchEnrollmentRepository enrollmentRepository;
     private final SecurityUtils securityUtils;
+    private final BatchRepository batchRepository;
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('TRAINER','ADMIN','SUPER_ADMIN')")
@@ -235,19 +238,10 @@ public class BatchController {
 
     @GetMapping("/course/{courseId}/upcoming")
     public ApiResponse<?> getUpcomingBatch(@PathVariable Long courseId) {
-        Batch batch = batchService.getUpcomingBatchByCourse(courseId);
-
-        if (batch == null) {
-            return ApiResponse.success(null);
-        }
-
-        return ApiResponse.success(Map.of(
-                "id", batch.getId(),
-                "name", batch.getName() != null ? batch.getName() : "",
-                "startDate", batch.getStartDate(),
-                "status", batch.getStatus() != null ? batch.getStatus().name() : "UPCOMING",
-                "courseName", batch.getCourse() != null ? batch.getCourse().getTitle() : "",
-                "trainerName", batch.getTrainer() != null ? batch.getTrainer().getName() : ""
-        ));
+        return batchRepository.findUpcomingByCourseId(courseId, PageRequest.of(0, 1))
+                .stream()
+                .findFirst()
+                .map(batch -> ApiResponse.success(batch))
+                .orElseGet(() -> ApiResponse.success(null));
     }
 }
