@@ -17,9 +17,7 @@ public class CourseRequestDTO {
     private String code;
 
     private String description;
-
-    private String thumbnailUrl;
-
+    
     @NotNull
     private CourseLevel level;
 
@@ -43,4 +41,5 @@ public class CourseRequestDTO {
     private Integer monthlyBatchDurationMonths;
 
     private Long defaultTrainerId;
+
 }

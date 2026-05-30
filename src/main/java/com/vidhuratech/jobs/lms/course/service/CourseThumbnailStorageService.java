@@ -14,9 +14,6 @@ import java.util.UUID;
 @Service
 public class CourseThumbnailStorageService {
 
-    @Value("${app.upload-dir:uploads}")
-    private String uploadDir;
-
     private static final long MAX_SIZE = 4 * 1024 * 1024;
 
     private static final Set<String> ALLOWED_TYPES = Set.of(
@@ -25,6 +22,9 @@ public class CourseThumbnailStorageService {
             "image/webp",
             "image/jpg"
     );
+
+    @Value("${app.upload-dir:uploads}")
+    private String uploadDir;
 
     public String store(MultipartFile file) {
         try {
@@ -37,7 +37,6 @@ public class CourseThumbnailStorageService {
             }
 
             String contentType = file.getContentType();
-
             if (contentType == null || !ALLOWED_TYPES.contains(contentType)) {
                 throw new RuntimeException("Only JPG, PNG, and WEBP images are allowed");
             }
@@ -48,10 +47,17 @@ public class CourseThumbnailStorageService {
 
             String fileName = UUID.randomUUID() + "_" + originalName;
 
-            Path uploadPath = Paths.get(uploadDir, "course-thumbnails");
+            Path uploadPath = Paths.get(uploadDir, "course-thumbnails")
+                    .toAbsolutePath()
+                    .normalize();
+
             Files.createDirectories(uploadPath);
 
-            Path filePath = uploadPath.resolve(fileName);
+            Path filePath = uploadPath.resolve(fileName).normalize();
+
+            if (!filePath.startsWith(uploadPath)) {
+                throw new RuntimeException("Invalid file name");
+            }
 
             Files.copy(
                     file.getInputStream(),
@@ -60,6 +66,7 @@ public class CourseThumbnailStorageService {
             );
 
             return "/course-thumbnails/" + fileName;
+
         } catch (Exception e) {
             throw new RuntimeException(e.getMessage() == null ? "Thumbnail upload failed" : e.getMessage());
         }

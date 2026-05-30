@@ -4,6 +4,7 @@ import com.vidhuratech.jobs.common.api.ApiResponse;
 import com.vidhuratech.jobs.lms.course.dto.*;
 import com.vidhuratech.jobs.lms.course.service.CourseService;
 import com.vidhuratech.jobs.lms.course.service.CourseThumbnailStorageService;
+import org.springframework.http.MediaType;
 import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -131,7 +132,7 @@ public class CourseController {
                 .build();
     }
 
-    @PostMapping("/{id}/thumbnail")
+    @PostMapping(value = "/{id}/thumbnail", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','TRAINER')")
     public ApiResponse<CourseResponseDTO> uploadThumbnail(
             @PathVariable Long id,
