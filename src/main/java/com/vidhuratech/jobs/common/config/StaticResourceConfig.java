@@ -23,5 +23,9 @@ public class StaticResourceConfig implements WebMvcConfigurer {
 
         registry.addResourceHandler("/course-thumbnails/**")
                 .addResourceLocations(thumbnailPath);
+
+        // Old DB/frontend URLs support. Later remove after cleanup.
+        registry.addResourceHandler("/uploads/course-thumbnails/**")
+                .addResourceLocations(thumbnailPath);
     }
 }

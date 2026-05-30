@@ -14,7 +14,6 @@ public class CourseMapper {
                 .title(dto.getTitle())
                 .code(dto.getCode().toUpperCase().trim())
                 .description(dto.getDescription())
-                .thumbnailUrl(dto.getThumbnailUrl())
                 .level(dto.getLevel())
                 .durationHours(dto.getDurationHours())
                 .startDate(dto.getStartDate())
@@ -40,7 +39,7 @@ public class CourseMapper {
                 .title(course.getTitle())
                 .code(course.getCode())
                 .description(course.getDescription())
-                .thumbnailUrl(course.getThumbnailUrl())
+                .thumbnailUrl(normalizeThumbnailUrl(course.getThumbnailUrl()))
                 .level(course.getLevel())
                 .status(course.getStatus())
                 .durationHours(course.getDurationHours())
@@ -71,7 +70,6 @@ public class CourseMapper {
         course.setTitle(dto.getTitle());
         course.setCode(dto.getCode().toUpperCase().trim());
         course.setDescription(dto.getDescription());
-        course.setThumbnailUrl(dto.getThumbnailUrl());
         course.setLevel(dto.getLevel());
         course.setDurationHours(dto.getDurationHours());
         course.setStartDate(dto.getStartDate());
@@ -88,5 +86,17 @@ public class CourseMapper {
                         ? 3
                         : dto.getMonthlyBatchDurationMonths()
         );
+    }
+
+    private String normalizeThumbnailUrl(String url) {
+        if (url == null || url.isBlank()) {
+            return null;
+        }
+
+        if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/")) {
+            return url;
+        }
+
+        return "/course-thumbnails/" + url;
     }
 }
