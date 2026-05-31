@@ -39,7 +39,7 @@ public class CourseMapper {
                 .title(course.getTitle())
                 .code(course.getCode())
                 .description(course.getDescription())
-                .thumbnailUrl(normalizeThumbnailUrl(course.getThumbnailUrl()))
+                .thumbnailUrl(course.getThumbnailUrl())
                 .level(course.getLevel())
                 .status(course.getStatus())
                 .durationHours(course.getDurationHours())
@@ -88,15 +88,4 @@ public class CourseMapper {
         );
     }
 
-    private String normalizeThumbnailUrl(String url) {
-        if (url == null || url.isBlank()) {
-            return null;
-        }
-
-        if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/")) {
-            return url;
-        }
-
-        return "/course-thumbnails/" + url;
-    }
 }

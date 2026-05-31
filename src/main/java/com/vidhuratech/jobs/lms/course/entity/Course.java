@@ -33,6 +33,7 @@ public class Course {
     @Column(length = 5000)
     private String description;
 
+    @Column(columnDefinition = "TEXT")
     private String thumbnailUrl;
 
     @Enumerated(EnumType.STRING)
