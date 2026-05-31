@@ -138,6 +138,7 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
+
 		<!--	REDIS CACHING	-->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -148,6 +149,13 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+
+		<!--	S3 image cloud storage digital ocean	-->
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>s3</artifactId>
+			<version>2.25.60</version>
 		</dependency>
 
 		<!--		RAZORPAY PAYMENT GATEWAY-->
