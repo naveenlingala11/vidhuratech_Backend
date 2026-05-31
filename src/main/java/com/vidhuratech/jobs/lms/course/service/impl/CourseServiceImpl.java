@@ -197,6 +197,7 @@ public class CourseServiceImpl implements CourseService {
     }
 
     @Override
+    @Transactional
     public CourseResponseDTO updateThumbnail(Long id, String thumbnailUrl) {
         Course course = getEntity(id);
         course.setThumbnailUrl(thumbnailUrl);
