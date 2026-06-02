@@ -2,13 +2,22 @@ package com.vidhuratech.jobs.publicpractice.service;
 
 import com.vidhuratech.jobs.common.exception.PracticeAccessRequiredException;
 import com.vidhuratech.jobs.common.notification.service.ActivityNotificationService;
+import com.vidhuratech.jobs.common.security.SecurityUtils;
 import com.vidhuratech.jobs.leads.entity.Lead;
 import com.vidhuratech.jobs.leads.repository.LeadRepository;
 import com.vidhuratech.jobs.leads.service.LeadService;
+import com.vidhuratech.jobs.plans.dto.UserPlanAccessDto;
+import com.vidhuratech.jobs.plans.service.PlanAccessService;
+import com.vidhuratech.jobs.prep.repository.InterviewQuestionRepository;
+import com.vidhuratech.jobs.prep.entity.InterviewQuestion;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vidhuratech.jobs.publicpractice.entity.PublicContestAnnouncement;
+import com.vidhuratech.jobs.publicpractice.repository.PublicContestAnnouncementRepository;
 import com.vidhuratech.jobs.student.service.CodeExecutionService;
 import com.vidhuratech.jobs.trainer.entity.*;
 import com.vidhuratech.jobs.trainer.repository.AssessmentRepository;
 import com.vidhuratech.jobs.trainer.repository.PseudoCodeChallengeRepository;
+import com.vidhuratech.jobs.user.entity.User;
 import com.vidhuratech.jobs.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,8 +30,12 @@ import com.vidhuratech.jobs.publicpractice.repository.PublicChallengeAttemptRepo
 import com.vidhuratech.jobs.publicpractice.repository.PublicPracticeAccessGrantRepository;
 
 import java.security.SecureRandom;
+import java.time.YearMonth;
 import java.util.Base64;
 
+import java.time.DayOfWeek;
+import java.time.LocalTime;
+import java.time.temporal.TemporalAdjusters;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -40,6 +53,7 @@ public class PublicPracticeService {
     private final PublicPracticeAccessGrantRepository grantRepository;
     private final PublicAssessmentAttemptRepository publicAssessmentAttemptRepository;
     private final PublicChallengeAttemptRepository publicChallengeAttemptRepository;
+    private final InterviewQuestionRepository interviewQuestionRepository;
     private final AssessmentRepository assessmentRepository;
     private final PseudoCodeChallengeRepository challengeRepository;
     private final LeadService leadService;
@@ -47,6 +61,10 @@ public class PublicPracticeService {
     private final LeadRepository leadRepository;
     private final ActivityNotificationService notificationService;
     private final UserRepository userRepository;
+    private final PublicContestAnnouncementRepository contestAnnouncementRepository;
+    private final PlanAccessService planAccessService;
+    private final ObjectMapper objectMapper;
+    private final SecurityUtils securityUtils;
 
     @Transactional(readOnly = true)
     public Map<String, Object> getPracticeLibrary() {
@@ -62,6 +80,12 @@ public class PublicPracticeService {
                 .map(this::mapChallengeCard)
                 .toList();
 
+        List<Map<String, Object>> interviewQuestions = interviewQuestionRepository
+                .findActivePublicQuestionsForLibrary()
+                .stream()
+                .map(this::mapInterviewQuestionCard)
+                .toList();
+
         Set<String> companies = new TreeSet<>();
         Set<String> skills = new TreeSet<>();
 
@@ -75,12 +99,18 @@ public class PublicPracticeService {
             skills.add(String.valueOf(item.get("skill")));
         });
 
+        interviewQuestions.forEach(item -> {
+            companies.add(String.valueOf(item.get("company")));
+            skills.add(String.valueOf(item.get("skill")));
+        });
+
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("assessments", assessments);
         response.put("challenges", challenges);
+        response.put("interviewQuestions", interviewQuestions);
         response.put("companies", companies);
         response.put("skills", skills);
-        response.put("totalItems", assessments.size() + challenges.size());
+        response.put("totalItems", assessments.size() + challenges.size() + interviewQuestions.size());
 
         return response;
     }
@@ -125,30 +155,34 @@ public class PublicPracticeService {
         List<Map<String, Object>> assessments =
                 ((List<Map<String, Object>>) library.get("assessments"))
                         .stream()
-                        .filter(item -> company.equalsIgnoreCase(
-                                String.valueOf(item.get("company"))
-                        ))
+                        .filter(item -> company.equalsIgnoreCase(String.valueOf(item.get("company"))))
                         .toList();
 
         List<Map<String, Object>> challenges =
                 ((List<Map<String, Object>>) library.get("challenges"))
                         .stream()
-                        .filter(item -> company.equalsIgnoreCase(
-                                String.valueOf(item.get("company"))
-                        ))
+                        .filter(item -> company.equalsIgnoreCase(String.valueOf(item.get("company"))))
+                        .toList();
+
+        List<Map<String, Object>> interviewQuestions =
+                ((List<Map<String, Object>>) library.get("interviewQuestions"))
+                        .stream()
+                        .filter(item -> company.equalsIgnoreCase(String.valueOf(item.get("company"))))
                         .toList();
 
         Set<String> skills = new TreeSet<>();
 
         assessments.forEach(item -> skills.add(String.valueOf(item.get("skill"))));
         challenges.forEach(item -> skills.add(String.valueOf(item.get("skill"))));
+        interviewQuestions.forEach(item -> skills.add(String.valueOf(item.get("skill"))));
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("company", company);
         response.put("assessments", assessments);
         response.put("challenges", challenges);
+        response.put("interviewQuestions", interviewQuestions);
         response.put("skills", skills);
-        response.put("totalItems", assessments.size() + challenges.size());
+        response.put("totalItems", assessments.size() + challenges.size() + interviewQuestions.size());
 
         return response;
     }
@@ -348,6 +382,7 @@ public class PublicPracticeService {
 
         int score = 0;
         List<Map<String, Object>> results = new ArrayList<>();
+        long totalExecutionTimeMs = 0L;
 
         for (PseudoCodeRule rule : challenge.getRules()) {
             if (isRulePassed(rule, sourceCode)) {
@@ -385,11 +420,22 @@ public class PublicPracticeService {
             item.put("executionTimeMs", execution.getExecutionTimeMs());
 
             results.add(item);
+            totalExecutionTimeMs += execution.getExecutionTimeMs() == null ? 0L : execution.getExecutionTimeMs();
         }
 
         int totalMarks = challenge.getTotalMarks() == null ? 0 : challenge.getTotalMarks();
         int percentage = totalMarks == 0 ? 0 : Math.round((score * 100f) / totalMarks);
-        int passPercentage = challenge.getPassPercentage() == null ? 40 : challenge.getPassPercentage();
+        int passPercentage = passPercentageForDifficulty(challenge);
+        String difficultyLevel = normalizedDifficulty(challenge);
+        Lead lead = leadRepository.findById(grant.getLeadId()).orElse(null);
+
+        Long matchedUserId = null;
+        if (lead != null && lead.getEmail() != null && !lead.getEmail().isBlank()) {
+            matchedUserId = userRepository.findByEmail(lead.getEmail())
+                    .map(user -> user.getId())
+                    .orElse(null);
+        }
+
         PublicChallengeAttempt attempt = PublicChallengeAttempt.builder()
                 .accessGrantId(grant.getId())
                 .leadId(grant.getLeadId())
@@ -400,6 +446,11 @@ public class PublicPracticeService {
                 .totalMarks(totalMarks)
                 .percentage(percentage)
                 .status(percentage >= passPercentage ? "PASS" : "FAIL")
+                .participantName(lead == null ? "" : lead.getName())
+                .participantEmail(lead == null ? "" : lead.getEmail())
+                .participantPhone(lead == null ? "" : lead.getPhone())
+                .userId(matchedUserId)
+                .totalExecutionTimeMs(totalExecutionTimeMs)
                 .submittedAt(LocalDateTime.now())
                 .build();
 
@@ -411,8 +462,12 @@ public class PublicPracticeService {
         response.put("totalMarks", totalMarks);
         response.put("percentage", percentage);
         response.put("status", percentage >= passPercentage ? "PASS" : "FAIL");
+        response.put("difficultyLevel", difficultyLevel);
+        response.put("passPercentage", passPercentage);
+        response.put("passed", percentage >= passPercentage);
         response.put("submittedAt", LocalDateTime.now());
         response.put("testResults", results);
+        response.put("rankPreview", getParticipantRankPreview(challenge.getId(), attempt));
         userRepository.findByEmail(challenge.getTrainerEmail()).ifPresent(trainer ->
                 notificationService.notifyTrainer(
                         trainer,
@@ -473,6 +528,39 @@ public class PublicPracticeService {
         map.put("challengeGroupTitle", safe(challenge.getChallengeGroupTitle()));
         map.put("accessLevel", challenge.getPublicAccessLevel());
         map.put("attemptLimit", challenge.getPublicAttemptLimit());
+        map.put("difficultyLevel", normalizedDifficulty(challenge));
+        map.put("passPercentage", passPercentageForDifficulty(challenge));
+
+        return map;
+    }
+
+    private Map<String, Object> mapInterviewQuestionCard(InterviewQuestion question) {
+        Map<String, Object> map = new LinkedHashMap<>();
+
+        map.put("id", question.getId());
+        map.put("type", "INTERVIEW");
+        map.put("title", safe(question.getQuestion()));
+        map.put("description", safe(question.getAnswer()));
+        map.put("question", safe(question.getQuestion()));
+        map.put("answer", safe(question.getAnswer()));
+        map.put("company", question.getCompany() == null || question.getCompany().isBlank()
+                ? "General"
+                : question.getCompany());
+        map.put("skill", question.getRole() == null || question.getRole().isBlank()
+                ? "Interview Preparation"
+                : question.getRole());
+        map.put("role", question.getRole() == null || question.getRole().isBlank()
+                ? "Interview Preparation"
+                : question.getRole());
+        map.put("topic", safe(question.getTopic()));
+        map.put("difficulty", question.getDifficulty() == null || question.getDifficulty().isBlank()
+                ? "MEDIUM"
+                : question.getDifficulty());
+        map.put("questionCount", 1);
+        map.put("durationMinutes", 0);
+        map.put("totalMarks", 0);
+        map.put("accessLevel", question.getPublicAccessLevel());
+        map.put("publishedAt", question.getPublishedAt());
 
         return map;
     }
@@ -751,6 +839,546 @@ public class PublicPracticeService {
 
         return lead;
     }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getChallengeLeaderboard(Long challengeId) {
+        PseudoCodeChallenge challenge = challengeRepository.findById(challengeId)
+                .orElseThrow(() -> new RuntimeException("Challenge not found"));
+
+        List<Map<String, Object>> entries = buildLeaderboard(
+                publicChallengeAttemptRepository.leaderboardByChallenge(challengeId),
+                100
+        );
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("challengeId", challenge.getId());
+        response.put("title", safe(challenge.getTitle()));
+        response.put("company", challenge.getCompanyName() == null ? "General" : challenge.getCompanyName());
+        response.put("totalMarks", challenge.getTotalMarks() == null ? 0 : challenge.getTotalMarks());
+        response.put("entries", entries);
+        response.put("topThree", entries.stream().limit(3).toList());
+
+        return response;
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getCurrentDailyLeaderboard() {
+        LocalDateTime start = LocalDateTime.now().with(LocalTime.MIN);
+        LocalDateTime end = LocalDateTime.now().with(LocalTime.MAX);
+
+        return buildPeriodLeaderboard("DAILY", start, end);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getCurrentWeeklyLeaderboard() {
+        LocalDateTime start = LocalDateTime.now()
+                .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                .with(LocalTime.MIN);
+
+        LocalDateTime end = start.plusDays(7).minusSeconds(1);
+
+        return buildPeriodLeaderboard("WEEKLY", start, end);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getCurrentMonthlyLeaderboard() {
+        YearMonth month = YearMonth.now();
+
+        LocalDateTime start = month.atDay(1).atStartOfDay();
+        LocalDateTime end = month.atEndOfMonth().atTime(LocalTime.MAX);
+
+        return buildPeriodLeaderboard("MONTHLY", start, end);
+    }
+
+    private Map<String, Object> buildPeriodLeaderboard(
+            String period,
+            LocalDateTime start,
+            LocalDateTime end
+    ) {
+        List<Map<String, Object>> entries = buildAggregateLeaderboard(
+                publicChallengeAttemptRepository.leaderboardBetween(start, end),
+                100
+        );
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("period", period);
+        response.put("start", start);
+        response.put("end", end);
+        response.put("entries", entries);
+        response.put("topThree", entries.stream().limit(3).toList());
+
+        return response;
+    }
+
+    private List<Map<String, Object>> buildAggregateLeaderboard(
+            List<PublicChallengeAttempt> attempts,
+            int limit
+    ) {
+        Map<Long, PseudoCodeChallenge> challenges = new HashMap<>();
+
+        for (PublicChallengeAttempt attempt : attempts) {
+            Long challengeId = attempt.getChallengeId();
+
+            if (challengeId != null && !challenges.containsKey(challengeId)) {
+                challengeRepository.findById(challengeId)
+                        .ifPresent(challenge -> challenges.put(challenge.getId(), challenge));
+            }
+        }
+
+        Map<String, Map<Long, PublicChallengeAttempt>> bestByParticipantChallenge = new LinkedHashMap<>();
+
+        for (PublicChallengeAttempt attempt : attempts) {
+            Long challengeId = attempt.getChallengeId();
+
+            if (challengeId == null) {
+                continue;
+            }
+
+            String participantKey = participantKey(attempt);
+
+            bestByParticipantChallenge.putIfAbsent(participantKey, new LinkedHashMap<>());
+
+            PublicChallengeAttempt existing = bestByParticipantChallenge
+                    .get(participantKey)
+                    .get(challengeId);
+
+            if (existing == null || isBetterAttempt(attempt, existing)) {
+                bestByParticipantChallenge.get(participantKey).put(challengeId, attempt);
+            }
+        }
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+
+        for (Map<Long, PublicChallengeAttempt> participantAttempts : bestByParticipantChallenge.values()) {
+            int attemptedChallenges = participantAttempts.size();
+            int solvedChallenges = 0;
+            int totalScore = 0;
+            int totalPossibleMarks = 0;
+            int percentageSum = 0;
+            long totalExecutionTimeMs = 0L;
+
+            PublicChallengeAttempt identityAttempt = participantAttempts.values()
+                    .stream()
+                    .findFirst()
+                    .orElse(null);
+
+            LocalDateTime latestSubmission = null;
+
+            List<String> solvedChallengeTitles = new ArrayList<>();
+            List<String> attemptedChallengeTitles = new ArrayList<>();
+            List<Map<String, Object>> challengeBreakdown = new ArrayList<>();
+
+            for (PublicChallengeAttempt attempt : participantAttempts.values()) {
+                Long challengeId = attempt.getChallengeId();
+                PseudoCodeChallenge challenge = challenges.get(challengeId);
+
+                int percentage = attempt.getPercentage() == null ? 0 : attempt.getPercentage();
+                int requiredPercentage = challenge == null ? 75 : passPercentageForDifficulty(challenge);
+                boolean solved = percentage >= requiredPercentage;
+
+                String difficultyLevel = challenge == null ? "MEDIUM" : normalizedDifficulty(challenge);
+                String challengeTitle = challenge == null
+                        ? "Challenge #" + challengeId
+                        : safe(challenge.getTitle());
+
+                attemptedChallengeTitles.add(challengeTitle);
+
+                if (solved) {
+                    solvedChallenges++;
+                    solvedChallengeTitles.add(challengeTitle);
+                }
+
+                int score = attempt.getScore() == null ? 0 : attempt.getScore();
+                int totalMarks = attempt.getTotalMarks() == null ? 0 : attempt.getTotalMarks();
+                long executionTime = attempt.getTotalExecutionTimeMs() == null
+                        ? 0L
+                        : attempt.getTotalExecutionTimeMs();
+
+                totalScore += score;
+                totalPossibleMarks += totalMarks;
+                percentageSum += percentage;
+                totalExecutionTimeMs += executionTime;
+
+                LocalDateTime submittedAt = attempt.getSubmittedAt();
+                if (submittedAt != null && (latestSubmission == null || submittedAt.isAfter(latestSubmission))) {
+                    latestSubmission = submittedAt;
+                }
+
+                Map<String, Object> breakdown = new LinkedHashMap<>();
+                breakdown.put("challengeId", challengeId);
+                breakdown.put("title", challengeTitle);
+                breakdown.put("difficultyLevel", difficultyLevel);
+                breakdown.put("requiredPercentage", requiredPercentage);
+                breakdown.put("percentage", percentage);
+                breakdown.put("score", score);
+                breakdown.put("totalMarks", totalMarks);
+                breakdown.put("status", solved ? "SOLVED" : "NOT_SOLVED");
+                breakdown.put("solved", solved);
+                breakdown.put("submittedAt", submittedAt);
+
+                challengeBreakdown.add(breakdown);
+            }
+
+            int averagePercentage = attemptedChallenges == 0
+                    ? 0
+                    : Math.round((float) percentageSum / attemptedChallenges);
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("name", maskName(identityAttempt == null ? "" : identityAttempt.getParticipantName()));
+            row.put("email", maskEmail(identityAttempt == null ? "" : identityAttempt.getParticipantEmail()));
+            row.put("phone", maskPhone(identityAttempt == null ? "" : identityAttempt.getParticipantPhone()));
+            row.put("attemptedChallenges", attemptedChallenges);
+            row.put("solvedChallenges", solvedChallenges);
+            row.put("solvedSummary", solvedChallenges + "/" + attemptedChallenges);
+            row.put("score", totalScore);
+            row.put("totalMarks", totalPossibleMarks);
+            row.put("percentage", averagePercentage);
+            row.put("totalExecutionTimeMs", totalExecutionTimeMs);
+            row.put("submittedAt", latestSubmission);
+            row.put("solvedChallengeTitles", solvedChallengeTitles);
+            row.put("attemptedChallengeTitles", attemptedChallengeTitles);
+            row.put("challengeBreakdown", challengeBreakdown);
+
+            rows.add(row);
+        }
+
+        rows.sort((a, b) -> {
+            int solvedCompare = Integer.compare(
+                    ((Number) b.get("solvedChallenges")).intValue(),
+                    ((Number) a.get("solvedChallenges")).intValue()
+            );
+            if (solvedCompare != 0) return solvedCompare;
+
+            int scoreCompare = Integer.compare(
+                    ((Number) b.get("score")).intValue(),
+                    ((Number) a.get("score")).intValue()
+            );
+            if (scoreCompare != 0) return scoreCompare;
+
+            int percentageCompare = Integer.compare(
+                    ((Number) b.get("percentage")).intValue(),
+                    ((Number) a.get("percentage")).intValue()
+            );
+            if (percentageCompare != 0) return percentageCompare;
+
+            int timeCompare = Long.compare(
+                    ((Number) a.get("totalExecutionTimeMs")).longValue(),
+                    ((Number) b.get("totalExecutionTimeMs")).longValue()
+            );
+            if (timeCompare != 0) return timeCompare;
+
+            LocalDateTime aSubmitted = (LocalDateTime) a.get("submittedAt");
+            LocalDateTime bSubmitted = (LocalDateTime) b.get("submittedAt");
+
+            if (aSubmitted == null && bSubmitted == null) return 0;
+            if (aSubmitted == null) return 1;
+            if (bSubmitted == null) return -1;
+
+            return aSubmitted.compareTo(bSubmitted);
+        });
+
+        List<Map<String, Object>> ranked = new ArrayList<>();
+
+        for (int i = 0; i < Math.min(rows.size(), limit); i++) {
+            Map<String, Object> row = new LinkedHashMap<>(rows.get(i));
+            row.put("rank", i + 1);
+            ranked.add(row);
+        }
+
+        return ranked;
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getContestAnnouncements() {
+        return contestAnnouncementRepository.findTop10ByPublishedTrueOrderByCreatedAtDesc()
+                .stream()
+                .map(announcement -> {
+                    Map<String, Object> map = new LinkedHashMap<>();
+                    map.put("id", announcement.getId());
+                    map.put("title", announcement.getTitle());
+                    map.put("message", announcement.getMessage());
+                    map.put("weekStart", announcement.getWeekStart());
+                    map.put("weekEnd", announcement.getWeekEnd());
+                    map.put("challengeId", announcement.getChallengeId());
+                    map.put("winnersJson", announcement.getWinnersJson());
+                    map.put("createdAt", announcement.getCreatedAt());
+                    return map;
+                })
+                .toList();
+    }
+
+    @Transactional
+    public Map<String, Object> publishWeeklyTopThreeAnnouncement() {
+        LocalDateTime weekStart = LocalDateTime.now()
+                .minusWeeks(1)
+                .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                .with(LocalTime.MIN);
+
+        LocalDateTime weekEnd = weekStart.plusDays(7).minusSeconds(1);
+
+        List<Map<String, Object>> winners = buildAggregateLeaderboard(
+                publicChallengeAttemptRepository.leaderboardBetween(weekStart, weekEnd),
+                3
+        );
+
+        if (winners.isEmpty()) {
+            return Map.of(
+                    "published", false,
+                    "message", "No contest attempts found for last week"
+            );
+        }
+
+        String winnerNames = winners.stream()
+                .map(w -> "#" + w.get("rank")
+                        + " " + w.get("name")
+                        + " - " + w.get("solvedChallenges") + " solved"
+                        + ", " + w.get("score") + "/" + w.get("totalMarks") + " marks")
+                .reduce((a, b) -> a + ", " + b)
+                .orElse("");
+
+        String winnersJson;
+        try {
+            winnersJson = objectMapper.writeValueAsString(winners);
+        } catch (Exception e) {
+            winnersJson = "[]";
+        }
+
+        PublicContestAnnouncement announcement = PublicContestAnnouncement.builder()
+                .title("Weekly Coding Contest Top 3 Winners")
+                .message("Congratulations to this week's top performers: " + winnerNames)
+                .weekStart(weekStart)
+                .weekEnd(weekEnd)
+                .challengeId(null)
+                .winnersJson(winnersJson)
+                .published(true)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        contestAnnouncementRepository.save(announcement);
+
+        notificationService.notifyAdmins(
+                "Weekly contest winners announced",
+                announcement.getMessage(),
+                "WEEKLY_CONTEST_WINNERS",
+                "/coding-contests"
+        );
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("published", true);
+        response.put("announcementId", announcement.getId());
+        response.put("winners", winners);
+
+        return response;
+    }
+
+    private List<Map<String, Object>> buildLeaderboard(
+            List<PublicChallengeAttempt> attempts,
+            int limit
+    ) {
+        Map<String, PublicChallengeAttempt> bestByParticipant = new LinkedHashMap<>();
+
+        for (PublicChallengeAttempt attempt : attempts) {
+            String key = participantKey(attempt);
+            PublicChallengeAttempt existing = bestByParticipant.get(key);
+
+            if (existing == null || isBetterAttempt(attempt, existing)) {
+                bestByParticipant.put(key, attempt);
+            }
+        }
+
+        List<PublicChallengeAttempt> sorted = bestByParticipant.values()
+                .stream()
+                .sorted((a, b) -> {
+                    int scoreCompare = Integer.compare(
+                            b.getScore() == null ? 0 : b.getScore(),
+                            a.getScore() == null ? 0 : a.getScore()
+                    );
+
+                    if (scoreCompare != 0) return scoreCompare;
+
+                    int timeCompare = Long.compare(
+                            a.getTotalExecutionTimeMs() == null ? Long.MAX_VALUE : a.getTotalExecutionTimeMs(),
+                            b.getTotalExecutionTimeMs() == null ? Long.MAX_VALUE : b.getTotalExecutionTimeMs()
+                    );
+
+                    if (timeCompare != 0) return timeCompare;
+
+                    return a.getSubmittedAt().compareTo(b.getSubmittedAt());
+                })
+                .limit(limit)
+                .toList();
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+
+        for (int i = 0; i < sorted.size(); i++) {
+            PublicChallengeAttempt attempt = sorted.get(i);
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("rank", i + 1);
+            row.put("attemptId", attempt.getId());
+            row.put("challengeId", attempt.getChallengeId());
+            row.put("name", maskName(attempt.getParticipantName()));
+            row.put("email", maskEmail(attempt.getParticipantEmail()));
+            row.put("phone", maskPhone(attempt.getParticipantPhone()));
+            row.put("score", attempt.getScore() == null ? 0 : attempt.getScore());
+            row.put("totalMarks", attempt.getTotalMarks() == null ? 0 : attempt.getTotalMarks());
+            row.put("percentage", attempt.getPercentage() == null ? 0 : attempt.getPercentage());
+            row.put("status", attempt.getStatus());
+            row.put("language", attempt.getLanguage());
+            row.put("totalExecutionTimeMs", attempt.getTotalExecutionTimeMs() == null ? 0 : attempt.getTotalExecutionTimeMs());
+            row.put("submittedAt", attempt.getSubmittedAt());
+
+            rows.add(row);
+        }
+
+        return rows;
+    }
+
+    private Map<String, Object> getParticipantRankPreview(Long challengeId, PublicChallengeAttempt latestAttempt) {
+        List<Map<String, Object>> leaderboard = buildLeaderboard(
+                publicChallengeAttemptRepository.leaderboardByChallenge(challengeId),
+                500
+        );
+
+        String currentKey = participantKey(latestAttempt);
+
+        for (Map<String, Object> row : leaderboard) {
+            Long attemptId = Long.valueOf(String.valueOf(row.get("attemptId")));
+            if (attemptId.equals(latestAttempt.getId())) {
+                return row;
+            }
+        }
+
+        return Map.of(
+                "score", latestAttempt.getScore() == null ? 0 : latestAttempt.getScore(),
+                "message", "Attempt recorded"
+        );
+    }
+
+    private boolean isBetterAttempt(PublicChallengeAttempt candidate, PublicChallengeAttempt existing) {
+        int candidateScore = candidate.getScore() == null ? 0 : candidate.getScore();
+        int existingScore = existing.getScore() == null ? 0 : existing.getScore();
+
+        if (candidateScore != existingScore) {
+            return candidateScore > existingScore;
+        }
+
+        int candidatePercentage = candidate.getPercentage() == null ? 0 : candidate.getPercentage();
+        int existingPercentage = existing.getPercentage() == null ? 0 : existing.getPercentage();
+
+        if (candidatePercentage != existingPercentage) {
+            return candidatePercentage > existingPercentage;
+        }
+
+        long candidateTime = candidate.getTotalExecutionTimeMs() == null
+                ? Long.MAX_VALUE
+                : candidate.getTotalExecutionTimeMs();
+
+        long existingTime = existing.getTotalExecutionTimeMs() == null
+                ? Long.MAX_VALUE
+                : existing.getTotalExecutionTimeMs();
+
+        if (candidateTime != existingTime) {
+            return candidateTime < existingTime;
+        }
+
+        if (candidate.getSubmittedAt() == null) return false;
+        if (existing.getSubmittedAt() == null) return true;
+
+        return candidate.getSubmittedAt().isBefore(existing.getSubmittedAt());
+    }
+
+    private int passPercentageForDifficulty(PseudoCodeChallenge challenge) {
+        String difficulty = String.valueOf(
+                challenge.getDifficultyLevel() == null ? "MEDIUM" : challenge.getDifficultyLevel()
+        ).trim().toUpperCase();
+
+        return switch (difficulty) {
+            case "EASY" -> 60;
+            case "HARD" -> 90;
+            default -> 75;
+        };
+    }
+
+    private String normalizedDifficulty(PseudoCodeChallenge challenge) {
+        String difficulty = String.valueOf(
+                challenge.getDifficultyLevel() == null ? "MEDIUM" : challenge.getDifficultyLevel()
+        ).trim().toUpperCase();
+
+        if (!Set.of("EASY", "MEDIUM", "HARD").contains(difficulty)) {
+            return "MEDIUM";
+        }
+
+        return difficulty;
+    }
+
+    private String participantKey(PublicChallengeAttempt attempt) {
+        if (attempt.getUserId() != null) {
+            return "USER:" + attempt.getUserId();
+        }
+
+        if (attempt.getParticipantEmail() != null && !attempt.getParticipantEmail().isBlank()) {
+            return "EMAIL:" + attempt.getParticipantEmail().trim().toLowerCase();
+        }
+
+        if (attempt.getParticipantPhone() != null && !attempt.getParticipantPhone().isBlank()) {
+            return "PHONE:" + attempt.getParticipantPhone().replaceAll("\\D", "");
+        }
+
+        return "ATTEMPT:" + attempt.getId();
+    }
+
+    private String maskName(String name) {
+        if (name == null || name.isBlank()) {
+            return "Participant";
+        }
+
+        String trimmed = name.trim();
+
+        if (trimmed.length() <= 2) {
+            return trimmed.charAt(0) + "*";
+        }
+
+        int visible = Math.max(2, trimmed.length() / 2);
+        String start = trimmed.substring(0, visible);
+
+        return start + "*".repeat(trimmed.length() - visible);
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || email.isBlank() || !email.contains("@")) {
+            return "";
+        }
+
+        String[] parts = email.split("@", 2);
+        String local = parts[0];
+        String domain = parts[1];
+
+        if (local.length() <= 2) {
+            return local.charAt(0) + "***@" + domain;
+        }
+
+        int visible = Math.max(2, local.length() / 2);
+        return local.substring(0, visible) + "*".repeat(local.length() - visible) + "@" + domain;
+    }
+
+    private String maskPhone(String phone) {
+        if (phone == null || phone.isBlank()) {
+            return "";
+        }
+
+        String digits = phone.replaceAll("\\D", "");
+
+        if (digits.length() <= 4) {
+            return "*".repeat(digits.length());
+        }
+
+        String start = digits.substring(0, Math.min(2, digits.length()));
+        String end = digits.substring(digits.length() - 2);
+
+        return start + "*".repeat(Math.max(digits.length() - 4, 3)) + end;
+    }
+
     private String normalize(String value) {
         return value == null
                 ? ""
@@ -764,5 +1392,244 @@ public class PublicPracticeService {
 
     private String safe(String value) {
         return value == null ? "" : value;
+    }
+
+    @Transactional
+    public Map<String, Object> registerAuthenticatedPracticeAccess(Map<String, Object> payload) {
+        Long userId = securityUtils.getCurrentUserId();
+
+        if (userId == null) {
+            throw new PracticeAccessRequiredException("Please login to continue");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new PracticeAccessRequiredException("Please login to continue"));
+
+        String practiceType = String.valueOf(payload.getOrDefault("practiceType", ""))
+                .trim()
+                .toUpperCase();
+
+        Long practiceId = Long.valueOf(String.valueOf(payload.get("practiceId")));
+
+        if (!practiceType.equals("ASSESSMENT")
+                && !practiceType.equals("CHALLENGE")
+                && !practiceType.equals("INTERVIEW")) {
+            throw new RuntimeException("Invalid practice type");
+        }
+
+        String accessLevel;
+        int attemptLimit;
+        String requiredFeature;
+
+        if (practiceType.equals("ASSESSMENT")) {
+            Assessment assessment = assessmentRepository.findById(practiceId)
+                    .orElseThrow(() -> new RuntimeException("Assessment not found"));
+
+            if (!Boolean.TRUE.equals(assessment.getActive())
+                    || !Boolean.TRUE.equals(assessment.getPublicVisible())) {
+                throw new RuntimeException("This assessment is not available publicly");
+            }
+
+            accessLevel = assessment.getPublicAccessLevel();
+            attemptLimit = assessment.getPublicAttemptLimit() == null
+                    ? 1
+                    : assessment.getPublicAttemptLimit();
+            requiredFeature = "MOCK_TESTS";
+
+        } else if (practiceType.equals("CHALLENGE")) {
+            PseudoCodeChallenge challenge = challengeRepository.findById(practiceId)
+                    .orElseThrow(() -> new RuntimeException("Challenge not found"));
+
+            if (!Boolean.TRUE.equals(challenge.getActive())
+                    || !Boolean.TRUE.equals(challenge.getPublicVisible())) {
+                throw new RuntimeException("This challenge is not available publicly");
+            }
+
+            accessLevel = challenge.getPublicAccessLevel();
+            attemptLimit = challenge.getPublicAttemptLimit() == null
+                    ? 1
+                    : challenge.getPublicAttemptLimit();
+            requiredFeature = "PREMIUM_CHALLENGES";
+
+        } else {
+            InterviewQuestion question = interviewQuestionRepository.findById(practiceId)
+                    .orElseThrow(() -> new RuntimeException("Interview question not found"));
+
+            if (!Boolean.TRUE.equals(question.getActive())
+                    || !Boolean.TRUE.equals(question.getPublicVisible())) {
+                throw new RuntimeException("This interview practice item is not available publicly");
+            }
+
+            accessLevel = question.getPublicAccessLevel();
+            attemptLimit = 1;
+            requiredFeature = "INTERVIEWS";
+        }
+
+        enforceAuthenticatedAccessPolicy(
+                accessLevel,
+                requiredFeature,
+                user.getId(),
+                user.getEmail(),
+                practiceType
+        );
+
+        Lead lead = saveOrReusePracticeLeadForUser(user, practiceType, practiceId);
+
+        PublicPracticeAccessGrant grant = PublicPracticeAccessGrant.builder()
+                .leadId(lead.getId())
+                .practiceType(practiceType)
+                .practiceId(practiceId)
+                .accessLevel(accessLevel)
+                .accessToken(generateAccessToken())
+                .maxAttempts(attemptLimit)
+                .attemptsUsed(0)
+                .expiresAt(LocalDateTime.now().plusHours(24))
+                .active(true)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        grantRepository.save(grant);
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("accessToken", grant.getAccessToken());
+        data.put("practiceType", grant.getPracticeType());
+        data.put("practiceId", grant.getPracticeId());
+        data.put("expiresAt", grant.getExpiresAt());
+        data.put("maxAttempts", grant.getMaxAttempts());
+        data.put("authenticated", true);
+        data.put("userId", user.getId());
+        data.put("accessLevel", accessLevel);
+        data.put("requiredFeature", requiredFeature);
+
+        return data;
+    }
+
+    private void enforceAuthenticatedAccessPolicy(
+            String accessLevel,
+            String requiredFeature,
+            Long userId,
+            String email,
+            String practiceType
+    ) {
+        String level = String.valueOf(accessLevel == null ? "LEAD_REQUIRED" : accessLevel)
+                .trim()
+                .toUpperCase();
+
+        if (level.equals("LEAD_REQUIRED") || level.equals("PUBLIC")) {
+            return;
+        }
+
+        if (level.equals("ACCOUNT_REQUIRED") || level.equals("ENROLLED_STUDENT_ONLY")) {
+            return;
+        }
+
+        if (requiresPaidPlan(level)) {
+            boolean allowed = planAccessService.hasFeatureAccess(userId, email, requiredFeature);
+
+            if (!allowed && "PREMIUM_CHALLENGES".equals(requiredFeature)) {
+                allowed = planAccessService.hasPremiumChallengeAccess(userId, email);
+            }
+
+            if (allowed) {
+                return;
+            }
+
+            throw new PracticeAccessRequiredException(
+                    premiumAccessMessage(requiredFeature, practiceType)
+            );
+        }
+
+        throw new PracticeAccessRequiredException(
+                "This practice item is not available for your account"
+        );
+    }
+
+    private boolean requiresPaidPlan(String accessLevel) {
+        String level = String.valueOf(accessLevel == null ? "" : accessLevel)
+                .trim()
+                .toUpperCase();
+
+        return level.equals("PAID_STUDENT_ONLY")
+                || level.equals("PREMIUM")
+                || level.equals("PRO_ONLY")
+                || level.equals("ELITE_ONLY");
+    }
+
+    private String premiumAccessMessage(String requiredFeature, String practiceType) {
+        return switch (requiredFeature) {
+            case "MOCK_TESTS" ->
+                    "Please purchase a plan with mock test access to unlock this assessment";
+            case "PREMIUM_CHALLENGES" ->
+                    "Please purchase a plan with premium coding challenge access to unlock this challenge";
+            case "INTERVIEWS" ->
+                    "Please purchase a plan with interview preparation access to unlock this practice item";
+            case "VIDEOS" ->
+                    "Please purchase a plan with video lessons access";
+            case "LIVE_CLASSES" ->
+                    "Please purchase a plan with live classes access";
+            case "COURSES" ->
+                    "Please purchase a plan with course access";
+            case "NOTES", "MATERIALS" ->
+                    "Please purchase a plan with notes and materials access";
+            default ->
+                    "Please purchase a premium plan to unlock this content";
+        };
+    }
+
+    private boolean canAccessByPolicy(String policy, UserPlanAccessDto access, boolean loggedIn, boolean leadSubmitted) {
+        String code = policy == null ? "LEAD_REQUIRED" : policy.trim().toUpperCase();
+
+        return switch (code) {
+            case "PUBLIC_PREVIEW" -> true;
+            case "LEAD_REQUIRED" -> leadSubmitted || loggedIn;
+            case "ACCOUNT_REQUIRED" -> loggedIn;
+            case "BASIC_PLAN" -> hasTierAtLeast(access, "BASIC");
+            case "PRO_PLAN" -> hasTierAtLeast(access, "PRO");
+            case "ELITE_PLAN" -> hasTierAtLeast(access, "ELITE");
+            case "ENROLLED_STUDENT_ONLY" -> access != null && access.isEnrolledStudent();
+            case "PAID_STUDENT_ONLY" -> access != null && access.isActive();
+            default -> false;
+        };
+    }
+
+    private boolean hasTierAtLeast(UserPlanAccessDto access, String requiredTier) {
+        if (access == null || !access.isActive()) return false;
+
+        int userRank = tierRank(access.getTier());
+        int requiredRank = tierRank(requiredTier);
+
+        return userRank >= requiredRank;
+    }
+
+    private int tierRank(String tier) {
+        if (tier == null) return 0;
+
+        return switch (tier.trim().toUpperCase()) {
+            case "BASIC", "STARTER" -> 1;
+            case "PRO" -> 2;
+            case "ELITE" -> 3;
+            default -> 0;
+        };
+    }
+
+    private Lead saveOrReusePracticeLeadForUser(User user, String practiceType, Long practiceId) {
+        String phone = user.getPhone() == null ? "" : user.getPhone().replaceAll("\\D", "");
+
+        if (phone.isBlank()) {
+            phone = "USER" + user.getId();
+        }
+
+        Optional<Lead> existing = leadRepository.findFirstByPhoneOrderByCreatedAtDesc(phone);
+
+        Lead lead = existing.orElseGet(Lead::new);
+        lead.setName(user.getName() == null || user.getName().isBlank() ? "Student" : user.getName());
+        lead.setEmail(user.getEmail());
+        lead.setPhone(phone);
+        lead.setCourse("Coding Contest");
+        lead.setMessage("Authenticated user access for " + practiceType + " #" + practiceId);
+        lead.setSource("PUBLIC_CONTEST_AUTHENTICATED");
+        lead.setDeleted(false);
+
+        return leadRepository.save(lead);
     }
 }

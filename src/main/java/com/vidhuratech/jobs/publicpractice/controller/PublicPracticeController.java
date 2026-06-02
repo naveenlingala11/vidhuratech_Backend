@@ -90,4 +90,55 @@ public class PublicPracticeController {
                 .data(service.registerPracticeAccess(payload))
                 .build();
     }
+
+    @GetMapping("/challenges/{id}/leaderboard")
+    public ApiResponse<?> getChallengeLeaderboard(@PathVariable Long id) {
+        return ApiResponse.builder()
+                .success(true)
+                .data(service.getChallengeLeaderboard(id))
+                .build();
+    }
+
+    @GetMapping("/announcements")
+    public ApiResponse<?> getContestAnnouncements() {
+        return ApiResponse.builder()
+                .success(true)
+                .data(service.getContestAnnouncements())
+                .build();
+    }
+
+    @GetMapping("/leaderboard/weekly")
+    public ApiResponse<?> getWeeklyLeaderboard() {
+        return ApiResponse.builder()
+                .success(true)
+                .data(service.getCurrentWeeklyLeaderboard())
+                .build();
+    }
+
+    @GetMapping("/leaderboard/daily")
+    public ApiResponse<?> getDailyLeaderboard() {
+        return ApiResponse.builder()
+                .success(true)
+                .data(service.getCurrentDailyLeaderboard())
+                .build();
+    }
+
+    @GetMapping("/leaderboard/monthly")
+    public ApiResponse<?> getMonthlyLeaderboard() {
+        return ApiResponse.builder()
+                .success(true)
+                .data(service.getCurrentMonthlyLeaderboard())
+                .build();
+    }
+
+    @PostMapping("/access/session")
+    public ApiResponse<?> registerAuthenticatedAccess(
+            @RequestBody Map<String, Object> payload
+    ) {
+        return ApiResponse.builder()
+                .success(true)
+                .message("Practice access unlocked")
+                .data(service.registerAuthenticatedPracticeAccess(payload))
+                .build();
+    }
 }

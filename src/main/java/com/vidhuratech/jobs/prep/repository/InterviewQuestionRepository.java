@@ -13,14 +13,18 @@ import java.util.Optional;
 public interface InterviewQuestionRepository extends JpaRepository<InterviewQuestion, Long> {
 
     @Query("""
-        SELECT q FROM InterviewQuestion q
+        SELECT q
+        FROM InterviewQuestion q
+        LEFT JOIN FETCH q.trainer
         WHERE q.trainer.email = :email
         ORDER BY q.createdAt DESC, q.id DESC
     """)
     List<InterviewQuestion> findByTrainerEmailOrderByCreatedAtDesc(@Param("email") String email);
 
     @Query("""
-        SELECT q FROM InterviewQuestion q
+        SELECT q
+        FROM InterviewQuestion q
+        LEFT JOIN FETCH q.trainer
         WHERE q.id = :id
         AND q.trainer.email = :email
     """)
@@ -32,7 +36,9 @@ public interface InterviewQuestionRepository extends JpaRepository<InterviewQues
     List<InterviewQuestion> findByBatchIdInAndActiveTrueOrderByCreatedAtDesc(List<Long> batchIds);
 
     @Query("""
-        SELECT q FROM InterviewQuestion q
+        SELECT q
+        FROM InterviewQuestion q
+        LEFT JOIN FETCH q.trainer
         WHERE q.active = true
         AND q.publicVisible = true
         AND (:company = '' OR LOWER(q.company) = :company)
@@ -54,7 +60,9 @@ public interface InterviewQuestionRepository extends JpaRepository<InterviewQues
     );
 
     @Query("""
-        SELECT q FROM InterviewQuestion q
+        SELECT q
+        FROM InterviewQuestion q
+        LEFT JOIN FETCH q.trainer
         WHERE q.batchId IN :batchIds
         AND q.active = true
         AND (:company = '' OR LOWER(q.company) = :company)
@@ -77,16 +85,26 @@ public interface InterviewQuestionRepository extends JpaRepository<InterviewQues
     );
 
     @Query("""
-        SELECT q FROM InterviewQuestion q
+        SELECT q
+        FROM InterviewQuestion q
         LEFT JOIN FETCH q.trainer
         ORDER BY q.createdAt DESC, q.id DESC
     """)
     List<InterviewQuestion> findAllPublicCandidates();
 
     @Query("""
-    SELECT q FROM InterviewQuestion q
-    LEFT JOIN FETCH q.trainer
-    WHERE q.id = :id
-""")
+        SELECT q
+        FROM InterviewQuestion q
+        LEFT JOIN FETCH q.trainer
+        WHERE q.id = :id
+    """)
     Optional<InterviewQuestion> findPublicPracticeCandidateById(@Param("id") Long id);
+
+    @Query("""
+    SELECT q FROM InterviewQuestion q
+    WHERE q.active = true
+    AND q.publicVisible = true
+    ORDER BY q.publishedAt DESC NULLS LAST, q.id DESC
+""")
+    List<InterviewQuestion> findActivePublicQuestionsForLibrary();
 }

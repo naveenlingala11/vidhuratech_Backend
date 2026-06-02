@@ -75,20 +75,71 @@ public class TrainerInterviewQuestionService {
             throw new RuntimeException("No interview questions found");
         }
 
+        String email = securityUtils.getCurrentUserEmail();
+
         List<Map<String, Object>> results = new ArrayList<>();
-        int success = 0;
+        List<InterviewQuestion> toSave = new ArrayList<>();
+        Map<Long, Batch> batchesById = new LinkedHashMap<>();
+
         int failed = 0;
 
         for (Map<String, Object> item : payloads) {
             try {
-                results.add(create(item));
-                success++;
+                Long batchId = readLong(item, "batchId", null);
+                if (batchId == null) {
+                    throw new RuntimeException("Batch is required");
+                }
+
+                Batch batch = batchesById.computeIfAbsent(batchId, id ->
+                        batchRepository.findByIdAndTrainerEmail(id, email)
+                                .orElseThrow(() -> new RuntimeException("Access denied for selected batch"))
+                );
+
+                InterviewQuestion q = new InterviewQuestion();
+                applyPayload(q, item);
+
+                q.setBatchId(batchId);
+                q.setTrainer(batch.getTrainer());
+                q.setActive(true);
+                q.setPublicVisible(false);
+                q.setPublicAccessLevel("LEAD_REQUIRED");
+                q.setCreatedAt(LocalDateTime.now());
+
+                toSave.add(q);
             } catch (Exception e) {
                 failed++;
                 results.add(Map.of(
                         "question", String.valueOf(item.getOrDefault("question", "Unknown")),
                         "error", e.getMessage()
                 ));
+            }
+        }
+
+        List<InterviewQuestion> savedQuestions = repo.saveAll(toSave);
+        savedQuestions.forEach(q -> results.add(map(q)));
+
+        int success = savedQuestions.size();
+
+        if (success > 0) {
+            String summary = buildBulkSummary(savedQuestions, success);
+
+            notificationService.notifyAdminsInAppOnly(
+                    "Interview questions uploaded",
+                    summary,
+                    "INTERVIEW_QUESTIONS_BULK_CREATED",
+                    "/dashboard/admin/public-practice"
+            );
+
+            for (Batch batch : batchesById.values()) {
+                if (batch.getEnrollments() != null) {
+                    notificationService.notifyBatchStudentsInAppOnly(
+                            batch.getEnrollments(),
+                            "New interview questions assigned",
+                            summary,
+                            "INTERVIEW_QUESTIONS_BULK_ASSIGNED",
+                            "/dashboard/student/interview-questions"
+                    );
+                }
             }
         }
 
@@ -176,6 +227,35 @@ public class TrainerInterviewQuestionService {
         }
 
         return Long.valueOf(String.valueOf(value));
+    }
+
+    private String buildBulkSummary(List<InterviewQuestion> questions, int count) {
+        String companies = questions.stream()
+                .map(InterviewQuestion::getCompany)
+                .filter(value -> value != null && !value.isBlank())
+                .distinct()
+                .limit(3)
+                .toList()
+                .toString();
+
+        String roles = questions.stream()
+                .map(InterviewQuestion::getRole)
+                .filter(value -> value != null && !value.isBlank())
+                .distinct()
+                .limit(3)
+                .toList()
+                .toString();
+
+        String topics = questions.stream()
+                .map(InterviewQuestion::getTopic)
+                .filter(value -> value != null && !value.isBlank())
+                .distinct()
+                .limit(5)
+                .toList()
+                .toString();
+
+        return count + " interview questions uploaded. Companies: "
+                + companies + ", Roles: " + roles + ", Topics: " + topics;
     }
 
     private Map<String, Object> map(InterviewQuestion q) {

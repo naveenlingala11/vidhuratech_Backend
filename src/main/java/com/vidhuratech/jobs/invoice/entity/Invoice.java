@@ -79,4 +79,7 @@ public class Invoice {
 
     @Column(name = "email_sent")
     private Boolean emailSent = false;
+
+    private String purchaseType;
+    private String planCode;
 }

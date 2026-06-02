@@ -14,6 +14,9 @@ import com.vidhuratech.jobs.lms.batch.entity.Batch;
 import com.vidhuratech.jobs.lms.batch.entity.BatchEnrollment;
 import com.vidhuratech.jobs.lms.batch.repository.BatchEnrollmentRepository;
 import com.vidhuratech.jobs.lms.batch.repository.BatchRepository;
+import com.vidhuratech.jobs.plans.entity.PlanAccessGrant;
+import com.vidhuratech.jobs.plans.repository.PlanAccessGrantRepository;
+import com.vidhuratech.jobs.plans.service.PlanCatalogService;
 import com.vidhuratech.jobs.user.entity.User;
 import com.vidhuratech.jobs.user.enums.UserRole;
 import com.vidhuratech.jobs.user.repository.UserRepository;
@@ -69,6 +72,12 @@ public class CheckoutService {
 
     @Autowired
     private PasswordService passwordService;
+
+    @Autowired
+    private PlanAccessGrantRepository planAccessGrantRepository;
+
+    @Autowired
+    private PlanCatalogService planCatalogService;
 
     // ================= INITIATE =================
     public Map<String, Object> initiateCheckout(CheckoutRequest request) {
@@ -276,12 +285,54 @@ public class CheckoutService {
         // =====================================================
         // 🔥 STEP 6: SEND EMAIL WITH PDF
         // =====================================================
+        grantProAccessForCoursePurchase(invoice, user);
 
         sendEmailIfNotSent(invoice, invoicePdf);
         log.info("Payment confirmed successfully for {}", invoiceId);
         System.out.println("INVOICE ID: " + invoiceId);
         System.out.println("BATCH ID: " + batchId);
         System.out.println("EMAIL: " + invoice.getEmail());
+    }
+
+    private void grantProAccessForCoursePurchase(Invoice invoice, User user) {
+        if (invoice == null || user == null || invoice.getId() == null) {
+            return;
+        }
+
+        if (planAccessGrantRepository.existsByInvoiceId(invoice.getId())) {
+            return;
+        }
+
+        Map<String, Object> plan = planCatalogService.getPlan("PRO");
+        int validityDays = ((Number) plan.get("validityDays")).intValue();
+        LocalDateTime now = LocalDateTime.now();
+
+        PlanAccessGrant grant = PlanAccessGrant.builder()
+                .userId(user.getId())
+                .invoiceId(invoice.getId())
+                .planCode(String.valueOf(plan.get("code")))
+                .planName(String.valueOf(plan.get("name")))
+                .buyerName(invoice.getName())
+                .buyerEmail(invoice.getEmail())
+                .buyerPhone(invoice.getMobile())
+                .amount(invoice.getAmount())
+                .status("ACTIVE")
+                .accessCourses((Boolean) plan.get("accessCourses"))
+                .accessMockTests((Boolean) plan.get("accessMockTests"))
+                .accessInterviews((Boolean) plan.get("accessInterviews"))
+                .accessNotes((Boolean) plan.get("accessNotes"))
+                .accessMaterials((Boolean) plan.get("accessMaterials"))
+                .accessVideos((Boolean) plan.get("accessVideos"))
+                .accessLiveClasses((Boolean) plan.get("accessLiveClasses"))
+                .accessPracticeCompanies((Boolean) plan.get("accessPracticeCompanies"))
+                .accessPremiumChallenges((Boolean) plan.get("accessPremiumChallenges"))
+                .companyLimit(((Number) plan.get("companyLimit")).intValue())
+                .startsAt(now)
+                .expiresAt(now.plusDays(validityDays))
+                .createdAt(now)
+                .build();
+
+        planAccessGrantRepository.save(grant);
     }
 
     private void sendEmailIfNotSent(Invoice invoice, MultipartFile invoicePdf) {

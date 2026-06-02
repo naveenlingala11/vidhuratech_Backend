@@ -6,6 +6,7 @@ import com.vidhuratech.jobs.user.dto.UpdateUserDTO;
 import com.vidhuratech.jobs.user.entity.User;
 import com.vidhuratech.jobs.user.enums.UserRole;
 import com.vidhuratech.jobs.user.repository.UserRepository;
+import com.vidhuratech.jobs.user.service.AdminPeopleActivityService;
 import com.vidhuratech.jobs.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -24,6 +25,7 @@ public class UserController {
 
     private final UserRepository userRepository;
     private final UserService userService;
+    private final AdminPeopleActivityService adminPeopleActivityService;
 
     @GetMapping
     public ApiResponse<?> getUsers(
@@ -127,5 +129,17 @@ public class UserController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<?> restoreUser(@PathVariable Long id) {
         return ApiResponse.success(userService.restoreUser(id), "User restored successfully");
+    }
+
+    @GetMapping("/people-360")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<?> people360(@RequestParam(required = false) String keyword) {
+        return ApiResponse.success(adminPeopleActivityService.people360(keyword));
+    }
+
+    @GetMapping("/people-360/{key}/history")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<?> peopleHistory(@PathVariable String key) {
+        return ApiResponse.success(adminPeopleActivityService.history(key));
     }
 }

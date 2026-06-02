@@ -32,5 +32,10 @@ public class PublicChallengeAttempt {
     private Integer percentage;
 
     private String status;
+    private String participantName;
+    private String participantEmail;
+    private String participantPhone;
+    private Long userId;
+    private Long totalExecutionTimeMs;
     private LocalDateTime submittedAt;
 }

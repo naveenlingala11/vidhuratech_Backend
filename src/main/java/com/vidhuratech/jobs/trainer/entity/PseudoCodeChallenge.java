@@ -55,6 +55,9 @@ public class PseudoCodeChallenge {
     private String skill;
 
     @Builder.Default
+    private String difficultyLevel = "MEDIUM";
+
+    @Builder.Default
     private Boolean publicVisible = false;
 
     @Builder.Default
