@@ -12,15 +12,14 @@ import com.vidhuratech.jobs.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class ActivityNotificationService {
 
     private final ActivityNotificationRepository repo;
@@ -308,5 +307,69 @@ public class ActivityNotificationService {
         map.put("createdAt", notification.getCreatedAt());
 
         return map;
+    }
+
+    public void notifyUserInAppOnly(User user, String title, String message, String type, String link) {
+        if (user == null || !isNotificationsEnabled(user)) {
+            return;
+        }
+
+        repo.save(ActivityNotification.builder()
+                .recipientUser(user)
+                .title(title)
+                .message(message)
+                .activityType(type)
+                .link(link)
+                .read(false)
+                .emailSent(false)
+                .createdAt(LocalDateTime.now())
+                .build());
+    }
+
+    public void notifyRoleInAppOnly(UserRole role, String title, String message, String type, String link) {
+        List<User> users = userRepo.findByRoleAndDeletedFalseAndActiveTrue(role);
+
+        for (User user : users) {
+            notifyUserInAppOnly(user, title, message, type, link);
+        }
+    }
+
+    public void notifyAdminsInAppOnly(String title, String message, String type, String link) {
+        notifyRoleInAppOnly(UserRole.ADMIN, title, message, type, link);
+        notifyRoleInAppOnly(UserRole.SUPER_ADMIN, title, message, type, link);
+    }
+
+    public void notifyBatchStudentsInAppOnly(
+            List<BatchEnrollment> enrollments,
+            String title,
+            String message,
+            String type,
+            String link
+    ) {
+        if (enrollments == null) {
+            return;
+        }
+
+        Set<Long> studentIds = new LinkedHashSet<>();
+
+        for (BatchEnrollment enrollment : enrollments) {
+            if (enrollment == null || !Boolean.TRUE.equals(enrollment.getActive())) {
+                continue;
+            }
+
+            if (enrollment.getStudent() != null && enrollment.getStudent().getId() != null) {
+                studentIds.add(enrollment.getStudent().getId());
+            }
+        }
+
+        if (studentIds.isEmpty()) {
+            return;
+        }
+
+        List<User> students = userRepo.findAllById(studentIds);
+
+        for (User student : students) {
+            notifyUserInAppOnly(student, title, message, type, link);
+        }
     }
 }

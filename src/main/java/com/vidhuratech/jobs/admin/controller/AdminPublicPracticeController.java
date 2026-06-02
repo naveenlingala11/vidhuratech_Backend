@@ -3,21 +3,22 @@ package com.vidhuratech.jobs.admin.controller;
 import com.vidhuratech.jobs.common.api.ApiResponse;
 import com.vidhuratech.jobs.common.notification.service.ActivityNotificationService;
 import com.vidhuratech.jobs.common.security.SecurityUtils;
-import com.vidhuratech.jobs.prep.entity.InterviewQuestion;
-import com.vidhuratech.jobs.prep.repository.InterviewQuestionRepository;
-import com.vidhuratech.jobs.trainer.entity.Assessment;
-import com.vidhuratech.jobs.trainer.entity.PseudoCodeChallenge;
-import com.vidhuratech.jobs.trainer.repository.AssessmentRepository;
-import com.vidhuratech.jobs.trainer.repository.PseudoCodeChallengeRepository;
 import com.vidhuratech.jobs.leads.entity.Lead;
 import com.vidhuratech.jobs.leads.repository.LeadRepository;
+import com.vidhuratech.jobs.prep.entity.InterviewQuestion;
+import com.vidhuratech.jobs.prep.repository.InterviewQuestionRepository;
 import com.vidhuratech.jobs.publicpractice.entity.PublicAssessmentAttempt;
 import com.vidhuratech.jobs.publicpractice.entity.PublicChallengeAttempt;
 import com.vidhuratech.jobs.publicpractice.repository.PublicAssessmentAttemptRepository;
 import com.vidhuratech.jobs.publicpractice.repository.PublicChallengeAttemptRepository;
+import com.vidhuratech.jobs.trainer.entity.Assessment;
+import com.vidhuratech.jobs.trainer.entity.PseudoCodeChallenge;
+import com.vidhuratech.jobs.trainer.repository.AssessmentRepository;
+import com.vidhuratech.jobs.trainer.repository.PseudoCodeChallengeRepository;
 import com.vidhuratech.jobs.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -39,6 +40,7 @@ public class AdminPublicPracticeController {
     private final ActivityNotificationService notificationService;
     private final InterviewQuestionRepository interviewQuestionRepository;
 
+    @Transactional(readOnly = true)
     @GetMapping("/candidates")
     public ApiResponse<?> candidates() {
         Map<String, Object> data = new LinkedHashMap<>();
@@ -61,6 +63,7 @@ public class AdminPublicPracticeController {
         return ApiResponse.success(data);
     }
 
+    @Transactional
     @PutMapping("/assessments/{id}/publish")
     public ApiResponse<?> publishAssessment(
             @PathVariable Long id,
@@ -74,44 +77,50 @@ public class AdminPublicPracticeController {
         assessment.setPublishedAt(LocalDateTime.now());
         assessment.setPublishedByUserId(securityUtils.getCurrentUserId());
 
-        assessmentRepository.save(assessment);
-        if (assessment.getTrainer() != null) {
+        Assessment saved = assessmentRepository.save(assessment);
+
+        if (saved.getTrainer() != null) {
             notificationService.notifyTrainer(
-                    assessment.getTrainer(),
+                    saved.getTrainer(),
                     "Assessment published",
-                    "Your assessment is now public: " + assessment.getTitle(),
+                    "Your assessment is now public: " + saved.getTitle(),
                     "ASSESSMENT_PUBLISHED",
                     "/dashboard/trainer/assessments"
             );
         }
-        return ApiResponse.success(mapAssessment(assessment), "Assessment published successfully");
+
+        return ApiResponse.success(mapAssessment(saved), "Assessment published successfully");
     }
 
+    @Transactional
     @PutMapping("/assessments/{id}/unpublish")
     public ApiResponse<?> unpublishAssessment(@PathVariable Long id) {
         Assessment assessment = assessmentRepository.findDetailedAssessment(id)
                 .orElseThrow(() -> new RuntimeException("Assessment not found"));
 
         assessment.setPublicVisible(false);
-        assessmentRepository.save(assessment);
-        if (assessment.getTrainer() != null) {
+        Assessment saved = assessmentRepository.save(assessment);
+
+        if (saved.getTrainer() != null) {
             notificationService.notifyTrainer(
-                    assessment.getTrainer(),
+                    saved.getTrainer(),
                     "Assessment unpublished",
-                    "Your assessment was removed from public practice: " + assessment.getTitle(),
+                    "Your assessment was removed from public practice: " + saved.getTitle(),
                     "ASSESSMENT_UNPUBLISHED",
                     "/dashboard/trainer/assessments"
             );
         }
-        return ApiResponse.success(mapAssessment(assessment), "Assessment unpublished successfully");
+
+        return ApiResponse.success(mapAssessment(saved), "Assessment unpublished successfully");
     }
 
+    @Transactional
     @PutMapping("/challenges/{id}/publish")
     public ApiResponse<?> publishChallenge(
             @PathVariable Long id,
             @RequestBody Map<String, Object> payload
     ) {
-        PseudoCodeChallenge challenge = challengeRepository.findById(id)
+        PseudoCodeChallenge challenge = challengeRepository.findPublicPracticeCandidateById(id)
                 .orElseThrow(() -> new RuntimeException("Challenge not found with id: " + id));
 
         applyChallengePublicSettings(challenge, payload);
@@ -136,13 +145,13 @@ public class AdminPublicPracticeController {
         return ApiResponse.success(mapChallenge(saved), "Challenge published successfully");
     }
 
+    @Transactional
     @PutMapping("/challenges/{id}/unpublish")
     public ApiResponse<?> unpublishChallenge(@PathVariable Long id) {
-        PseudoCodeChallenge challenge = challengeRepository.findById(id)
+        PseudoCodeChallenge challenge = challengeRepository.findPublicPracticeCandidateById(id)
                 .orElseThrow(() -> new RuntimeException("Challenge not found with id: " + id));
 
         challenge.setPublicVisible(false);
-
         PseudoCodeChallenge saved = challengeRepository.save(challenge);
 
         if (saved.getTrainerEmail() != null && !saved.getTrainerEmail().isBlank()) {
@@ -160,6 +169,7 @@ public class AdminPublicPracticeController {
         return ApiResponse.success(mapChallenge(saved), "Challenge unpublished successfully");
     }
 
+    @Transactional
     @PutMapping("/interview-questions/{id}/publish")
     public ApiResponse<?> publishInterviewQuestion(
             @PathVariable Long id,
@@ -188,6 +198,7 @@ public class AdminPublicPracticeController {
         return ApiResponse.success(mapInterviewQuestion(saved), "Interview question published successfully");
     }
 
+    @Transactional
     @PutMapping("/interview-questions/{id}/unpublish")
     public ApiResponse<?> unpublishInterviewQuestion(@PathVariable Long id) {
         InterviewQuestion question = interviewQuestionRepository.findPublicPracticeCandidateById(id)
@@ -209,6 +220,21 @@ public class AdminPublicPracticeController {
         return ApiResponse.success(mapInterviewQuestion(saved), "Interview question unpublished successfully");
     }
 
+    @Transactional
+    @PutMapping("/bulk/publish")
+    public ApiResponse<?> bulkPublish(@RequestBody Map<String, Object> payload) {
+        Map<String, Object> result = bulkUpdatePublicPractice(payload, true);
+        return ApiResponse.success(result, "Bulk publish completed successfully");
+    }
+
+    @Transactional
+    @PutMapping("/bulk/unpublish")
+    public ApiResponse<?> bulkUnpublish(@RequestBody Map<String, Object> payload) {
+        Map<String, Object> result = bulkUpdatePublicPractice(payload, false);
+        return ApiResponse.success(result, "Bulk unpublish completed successfully");
+    }
+
+    @Transactional(readOnly = true)
     @GetMapping("/attempts")
     public ApiResponse<?> attempts() {
         Map<String, Object> data = new LinkedHashMap<>();
@@ -232,6 +258,7 @@ public class AdminPublicPracticeController {
         return ApiResponse.success(data);
     }
 
+    @Transactional(readOnly = true)
     @GetMapping("/assessments/{id}/attempts")
     public ApiResponse<?> assessmentAttempts(@PathVariable Long id) {
         return ApiResponse.success(
@@ -242,6 +269,7 @@ public class AdminPublicPracticeController {
         );
     }
 
+    @Transactional(readOnly = true)
     @GetMapping("/challenges/{id}/attempts")
     public ApiResponse<?> challengeAttempts(@PathVariable Long id) {
         return ApiResponse.success(
@@ -265,6 +293,103 @@ public class AdminPublicPracticeController {
         return ApiResponse.success(policies);
     }
 
+    private Map<String, Object> bulkUpdatePublicPractice(
+            Map<String, Object> payload,
+            boolean publish
+    ) {
+        String type = readText(payload, "type", "").toUpperCase(Locale.ROOT);
+        List<Long> ids = readIds(payload.get("ids"));
+
+        if (ids.isEmpty()) {
+            throw new RuntimeException("Please select at least one item");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        Long currentUserId = securityUtils.getCurrentUserId();
+        int requested = ids.size();
+        int updated = 0;
+        int skippedInactive = 0;
+        List<Map<String, Object>> items = new ArrayList<>();
+
+        if ("ASSESSMENT".equals(type)) {
+            for (Long id : ids) {
+                Assessment assessment = assessmentRepository.findDetailedAssessment(id).orElse(null);
+                if (assessment == null) continue;
+
+                if (publish && !Boolean.TRUE.equals(assessment.getActive())) {
+                    skippedInactive++;
+                    continue;
+                }
+
+                if (publish) {
+                    applyAssessmentBulkSettings(assessment, payload);
+                    assessment.setPublicVisible(true);
+                    assessment.setPublishedAt(now);
+                    assessment.setPublishedByUserId(currentUserId);
+                } else {
+                    assessment.setPublicVisible(false);
+                }
+
+                items.add(mapAssessment(assessmentRepository.save(assessment)));
+                updated++;
+            }
+        } else if ("CHALLENGE".equals(type)) {
+            for (Long id : ids) {
+                PseudoCodeChallenge challenge = challengeRepository.findPublicPracticeCandidateById(id).orElse(null);
+                if (challenge == null) continue;
+
+                if (publish && !Boolean.TRUE.equals(challenge.getActive())) {
+                    skippedInactive++;
+                    continue;
+                }
+
+                if (publish) {
+                    applyChallengeBulkSettings(challenge, payload);
+                    challenge.setPublicVisible(true);
+                    challenge.setPublishedAt(now);
+                    challenge.setPublishedByUserId(currentUserId);
+                } else {
+                    challenge.setPublicVisible(false);
+                }
+
+                items.add(mapChallenge(challengeRepository.save(challenge)));
+                updated++;
+            }
+        } else if ("INTERVIEW".equals(type)) {
+            for (Long id : ids) {
+                InterviewQuestion question = interviewQuestionRepository.findPublicPracticeCandidateById(id).orElse(null);
+                if (question == null) continue;
+
+                if (publish && !Boolean.TRUE.equals(question.getActive())) {
+                    skippedInactive++;
+                    continue;
+                }
+
+                if (publish) {
+                    applyInterviewQuestionPublicSettings(question, payload);
+                    question.setPublicVisible(true);
+                    question.setPublishedAt(now);
+                    question.setPublishedByUserId(currentUserId);
+                } else {
+                    question.setPublicVisible(false);
+                }
+
+                items.add(mapInterviewQuestion(interviewQuestionRepository.save(question)));
+                updated++;
+            }
+        } else {
+            throw new RuntimeException("Unsupported practice type");
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("type", type);
+        result.put("requested", requested);
+        result.put("updated", updated);
+        result.put("skippedInactive", skippedInactive);
+        result.put("items", items);
+        return result;
+    }
+
     private void applyInterviewQuestionPublicSettings(
             InterviewQuestion question,
             Map<String, Object> payload
@@ -272,6 +397,58 @@ public class AdminPublicPracticeController {
         question.setCompany(readText(payload, "companyName", safe(question.getCompany())));
         question.setRole(readText(payload, "skill", safe(question.getRole())));
         question.setPublicAccessLevel(readText(payload, "accessLevel", "LEAD_REQUIRED"));
+    }
+
+    private void applyAssessmentPublicSettings(Assessment assessment, Map<String, Object> payload) {
+        assessment.setCompanyName(readText(payload, "companyName", "General"));
+        assessment.setSkill(readText(payload, "skill", "Placement Readiness"));
+        assessment.setPublicAccessLevel(readText(payload, "accessLevel", "LEAD_REQUIRED"));
+        assessment.setPublicAttemptLimit(readInt(payload, "attemptLimit", 1));
+    }
+
+    private void applyChallengePublicSettings(PseudoCodeChallenge challenge, Map<String, Object> payload) {
+        challenge.setCompanyName(readText(payload, "companyName", "General"));
+        challenge.setSkill(readText(payload, "skill", "Coding"));
+        challenge.setPublicAccessLevel(readText(payload, "accessLevel", "LEAD_REQUIRED"));
+        challenge.setPublicAttemptLimit(readInt(payload, "attemptLimit", 1));
+    }
+
+    private void applyAssessmentBulkSettings(Assessment assessment, Map<String, Object> payload) {
+        assessment.setCompanyName(readText(
+                payload,
+                "companyName",
+                assessment.getCompanyName() == null || assessment.getCompanyName().isBlank()
+                        ? "General"
+                        : assessment.getCompanyName()
+        ));
+        assessment.setSkill(readText(
+                payload,
+                "skill",
+                assessment.getSkill() == null || assessment.getSkill().isBlank()
+                        ? "Placement Readiness"
+                        : assessment.getSkill()
+        ));
+        assessment.setPublicAccessLevel(readText(payload, "accessLevel", "LEAD_REQUIRED"));
+        assessment.setPublicAttemptLimit(readInt(payload, "attemptLimit", 1));
+    }
+
+    private void applyChallengeBulkSettings(PseudoCodeChallenge challenge, Map<String, Object> payload) {
+        challenge.setCompanyName(readText(
+                payload,
+                "companyName",
+                challenge.getCompanyName() == null || challenge.getCompanyName().isBlank()
+                        ? "General"
+                        : challenge.getCompanyName()
+        ));
+        challenge.setSkill(readText(
+                payload,
+                "skill",
+                challenge.getSkill() == null || challenge.getSkill().isBlank()
+                        ? "Coding"
+                        : challenge.getSkill()
+        ));
+        challenge.setPublicAccessLevel(readText(payload, "accessLevel", "LEAD_REQUIRED"));
+        challenge.setPublicAttemptLimit(readInt(payload, "attemptLimit", 1));
     }
 
     private Map<String, Object> mapInterviewQuestion(InterviewQuestion q) {
@@ -313,10 +490,6 @@ public class AdminPublicPracticeController {
         return map;
     }
 
-    private String safe(String value) {
-        return value == null ? "" : value;
-    }
-
     private Map<String, Object> mapAssessment(Assessment assessment) {
         Map<String, Object> map = new LinkedHashMap<>();
 
@@ -324,76 +497,37 @@ public class AdminPublicPracticeController {
         map.put("type", "ASSESSMENT");
         map.put("title", assessment.getTitle());
         map.put("description", assessment.getDescription());
-
-        map.put(
-                "trainerEmail",
-                assessment.getTrainer() == null ? "" : assessment.getTrainer().getEmail()
-        );
-
-        map.put(
-                "trainerName",
-                assessment.getTrainer() == null ? "" : assessment.getTrainer().getName()
-        );
-
-        map.put(
-                "batchId",
-                assessment.getBatch() == null ? null : assessment.getBatch().getId()
-        );
-
-        map.put(
-                "batchName",
-                assessment.getBatch() == null ? "" : assessment.getBatch().getName()
-        );
-
+        map.put("trainerEmail", assessment.getTrainer() == null ? "" : assessment.getTrainer().getEmail());
+        map.put("trainerName", assessment.getTrainer() == null ? "" : assessment.getTrainer().getName());
+        map.put("batchId", assessment.getBatch() == null ? null : assessment.getBatch().getId());
+        map.put("batchName", assessment.getBatch() == null ? "" : assessment.getBatch().getName());
         map.put(
                 "courseName",
                 assessment.getBatch() == null || assessment.getBatch().getCourse() == null
                         ? ""
                         : assessment.getBatch().getCourse().getTitle()
         );
-
         map.put(
                 "companyName",
                 assessment.getCompanyName() == null || assessment.getCompanyName().isBlank()
                         ? "General"
                         : assessment.getCompanyName()
         );
-
         map.put(
                 "skill",
                 assessment.getSkill() == null || assessment.getSkill().isBlank()
                         ? "Placement Readiness"
                         : assessment.getSkill()
         );
-
         map.put("active", Boolean.TRUE.equals(assessment.getActive()));
         map.put("publicVisible", Boolean.TRUE.equals(assessment.getPublicVisible()));
-        map.put(
-                "publicStatus",
-                Boolean.TRUE.equals(assessment.getPublicVisible())
-                        ? "PUBLISHED"
-                        : "NOT_PUBLISHED"
-        );
-        map.put(
-                "publicAccessLevel",
-                assessment.getPublicAccessLevel() == null
-                        ? "LEAD_REQUIRED"
-                        : assessment.getPublicAccessLevel()
-        );
-        map.put(
-                "publicAttemptLimit",
-                assessment.getPublicAttemptLimit() == null
-                        ? 1
-                        : assessment.getPublicAttemptLimit()
-        );
+        map.put("publicStatus", Boolean.TRUE.equals(assessment.getPublicVisible()) ? "PUBLISHED" : "NOT_PUBLISHED");
+        map.put("publicAccessLevel", assessment.getPublicAccessLevel() == null ? "LEAD_REQUIRED" : assessment.getPublicAccessLevel());
+        map.put("publicAttemptLimit", assessment.getPublicAttemptLimit() == null ? 1 : assessment.getPublicAttemptLimit());
         map.put("publishedAt", assessment.getPublishedAt());
         map.put("publishedByUserId", assessment.getPublishedByUserId());
         map.put("questionCount", assessment.getQuestions() == null ? 0 : assessment.getQuestions().size());
-
-        map.put(
-                "publicAttemptCount",
-                publicAssessmentAttemptRepository.countByAssessmentId(assessment.getId())
-        );
+        map.put("publicAttemptCount", publicAssessmentAttemptRepository.countByAssessmentId(assessment.getId()));
 
         return map;
     }
@@ -405,61 +539,33 @@ public class AdminPublicPracticeController {
         map.put("type", "CHALLENGE");
         map.put("title", challenge.getTitle());
         map.put("description", challenge.getProblemStatement());
-
         map.put("trainerEmail", challenge.getTrainerEmail());
         map.put("trainerName", challenge.getTrainerEmail());
         map.put("batchId", challenge.getBatchId());
         map.put("batchName", challenge.getBatchId() == null ? "" : "Batch #" + challenge.getBatchId());
-
         map.put(
                 "companyName",
                 challenge.getCompanyName() == null || challenge.getCompanyName().isBlank()
                         ? "General"
                         : challenge.getCompanyName()
         );
-
         map.put(
                 "skill",
                 challenge.getSkill() == null || challenge.getSkill().isBlank()
                         ? "Coding"
                         : challenge.getSkill()
         );
-
         map.put("challengeGroupId", challenge.getChallengeGroupId());
         map.put("challengeGroupTitle", challenge.getChallengeGroupTitle());
-
         map.put("active", Boolean.TRUE.equals(challenge.getActive()));
         map.put("publicVisible", Boolean.TRUE.equals(challenge.getPublicVisible()));
-        map.put(
-                "publicStatus",
-                Boolean.TRUE.equals(challenge.getPublicVisible())
-                        ? "PUBLISHED"
-                        : "NOT_PUBLISHED"
-        );
-        map.put(
-                "publicAccessLevel",
-                challenge.getPublicAccessLevel() == null
-                        ? "LEAD_REQUIRED"
-                        : challenge.getPublicAccessLevel()
-        );
-        map.put(
-                "publicAttemptLimit",
-                challenge.getPublicAttemptLimit() == null
-                        ? 1
-                        : challenge.getPublicAttemptLimit()
-        );
+        map.put("publicStatus", Boolean.TRUE.equals(challenge.getPublicVisible()) ? "PUBLISHED" : "NOT_PUBLISHED");
+        map.put("publicAccessLevel", challenge.getPublicAccessLevel() == null ? "LEAD_REQUIRED" : challenge.getPublicAccessLevel());
+        map.put("publicAttemptLimit", challenge.getPublicAttemptLimit() == null ? 1 : challenge.getPublicAttemptLimit());
         map.put("publishedAt", challenge.getPublishedAt());
         map.put("publishedByUserId", challenge.getPublishedByUserId());
-        map.put(
-                "testCasesCount",
-                challenge.getTestCases() == null
-                        ? 0
-                        : challenge.getTestCases().size()
-        );
-        map.put(
-                "publicAttemptCount",
-                publicChallengeAttemptRepository.countByChallengeId(challenge.getId())
-        );
+        map.put("testCasesCount", challenge.getTestCases() == null ? 0 : challenge.getTestCases().size());
+        map.put("publicAttemptCount", publicChallengeAttemptRepository.countByChallengeId(challenge.getId()));
 
         return map;
     }
@@ -478,12 +584,10 @@ public class AdminPublicPracticeController {
         map.put("leadPhone", lead == null ? "" : lead.getPhone());
         map.put("leadEmail", lead == null ? "" : lead.getEmail());
         map.put("leadCity", lead == null ? "" : lead.getCity());
-
         map.put("practiceId", attempt.getAssessmentId());
         map.put("practiceTitle", assessment == null ? "Assessment" : assessment.getTitle());
         map.put("companyName", assessment == null ? "" : assessment.getCompanyName());
         map.put("skill", assessment == null ? "" : assessment.getSkill());
-
         map.put("score", attempt.getScore());
         map.put("totalMarks", attempt.getTotalMarks());
         map.put("percentage", attempt.getPercentage());
@@ -509,12 +613,10 @@ public class AdminPublicPracticeController {
         map.put("leadPhone", lead == null ? "" : lead.getPhone());
         map.put("leadEmail", lead == null ? "" : lead.getEmail());
         map.put("leadCity", lead == null ? "" : lead.getCity());
-
         map.put("practiceId", attempt.getChallengeId());
         map.put("practiceTitle", challenge == null ? "Challenge" : challenge.getTitle());
         map.put("companyName", challenge == null ? "" : challenge.getCompanyName());
         map.put("skill", challenge == null ? "" : challenge.getSkill());
-
         map.put("language", attempt.getLanguage());
         map.put("sourceCode", attempt.getSourceCode());
         map.put("score", attempt.getScore());
@@ -533,24 +635,12 @@ public class AdminPublicPracticeController {
         return map;
     }
 
-    private void applyAssessmentPublicSettings(Assessment assessment, Map<String, Object> payload) {
-        assessment.setCompanyName(readText(payload, "companyName", "General"));
-        assessment.setSkill(readText(payload, "skill", "Placement Readiness"));
-        assessment.setPublicAccessLevel(readText(payload, "accessLevel", "LEAD_REQUIRED"));
-        assessment.setPublicAttemptLimit(readInt(payload, "attemptLimit", 1));
-    }
-
-    private void applyChallengePublicSettings(PseudoCodeChallenge challenge, Map<String, Object> payload) {
-        challenge.setCompanyName(readText(payload, "companyName", "General"));
-        challenge.setSkill(readText(payload, "skill", "Coding"));
-        challenge.setPublicAccessLevel(readText(payload, "accessLevel", "LEAD_REQUIRED"));
-        challenge.setPublicAttemptLimit(readInt(payload, "attemptLimit", 1));
+    private String safe(String value) {
+        return value == null ? "" : value;
     }
 
     private String readText(Map<String, Object> payload, String key, String defaultValue) {
-        if (payload == null) {
-            return defaultValue;
-        }
+        if (payload == null) return defaultValue;
 
         Object value = payload.get(key);
 
@@ -562,9 +652,7 @@ public class AdminPublicPracticeController {
     }
 
     private int readInt(Map<String, Object> payload, String key, int defaultValue) {
-        if (payload == null) {
-            return defaultValue;
-        }
+        if (payload == null) return defaultValue;
 
         Object value = payload.get(key);
 
@@ -578,5 +666,23 @@ public class AdminPublicPracticeController {
         } catch (NumberFormatException e) {
             return defaultValue;
         }
+    }
+
+    private List<Long> readIds(Object rawIds) {
+        if (!(rawIds instanceof Collection<?> values)) {
+            return List.of();
+        }
+
+        return values.stream()
+                .map(value -> {
+                    try {
+                        return Long.parseLong(String.valueOf(value));
+                    } catch (NumberFormatException e) {
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
     }
 }
