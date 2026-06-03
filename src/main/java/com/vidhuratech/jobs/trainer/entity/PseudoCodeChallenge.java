@@ -71,4 +71,13 @@ public class PseudoCodeChallenge {
 
     @Column(columnDefinition = "TEXT")
     private String hintText;
+
+    @Column(columnDefinition = "TEXT")
+    private String constraintsImageUrl;
+
+    @Column(columnDefinition = "TEXT")
+    private String inputFormatImageUrl;
+
+    @Column(columnDefinition = "TEXT")
+    private String outputFormatImageUrl;
 }

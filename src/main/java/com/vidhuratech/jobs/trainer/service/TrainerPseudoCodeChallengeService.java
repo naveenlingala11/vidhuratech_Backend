@@ -76,6 +76,9 @@ public class TrainerPseudoCodeChallengeService {
                 .publicAccessLevel("LEAD_REQUIRED")
                 .publicAttemptLimit(1)
                 .hintText(String.valueOf(payload.getOrDefault("hintText", "")))
+                .constraintsImageUrl(getString(payload, "constraintsImageUrl", ""))
+                .inputFormatImageUrl(getString(payload, "inputFormatImageUrl", ""))
+                .outputFormatImageUrl(getString(payload, "outputFormatImageUrl", ""))
                 .build();
 
         Object rawRules = payload.getOrDefault("rules", List.of());
@@ -193,7 +196,9 @@ public class TrainerPseudoCodeChallengeService {
          challenge.setHintText(
                  String.valueOf(payload.getOrDefault("hintText", ""))
          );
-
+         challenge.setConstraintsImageUrl(getString(payload, "constraintsImageUrl", ""));
+         challenge.setInputFormatImageUrl(getString(payload, "inputFormatImageUrl", ""));
+         challenge.setOutputFormatImageUrl(getString(payload, "outputFormatImageUrl", ""));
         // clear old rules
         challenge.getRules().clear();
 
