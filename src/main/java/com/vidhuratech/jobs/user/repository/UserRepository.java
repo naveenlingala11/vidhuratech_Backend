@@ -46,4 +46,8 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     Optional<User> findByIdAndRoleAndDeletedFalseAndActiveTrue(Long id, UserRole role);
 
+    Optional<User> findByPhone(String phone);
+
+    boolean existsByPhone(String phone);
+
 }

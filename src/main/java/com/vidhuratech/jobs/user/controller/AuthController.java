@@ -330,6 +330,33 @@ public class AuthController {
         ));
     }
 
+    @PostMapping("/oauth/google")
+    public ResponseEntity<AuthResponse> googleLogin(@RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(authService.loginWithGoogle(body.get("idToken")));
+    }
+
+    @PostMapping("/oauth/github")
+    public ResponseEntity<AuthResponse> githubLogin(@RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(authService.loginWithGithub(
+                body.get("code"),
+                body.get("redirectUri")
+        ));
+    }
+
+    @PostMapping("/phone/send-otp")
+    public ResponseEntity<?> sendPhoneOtp(@RequestBody Map<String, String> body) {
+        otpService.sendPhoneOtp(body.get("phone"));
+        return ResponseEntity.ok(Map.of("message", "OTP sent"));
+    }
+
+    @PostMapping("/phone/verify-otp")
+    public ResponseEntity<AuthResponse> verifyPhoneOtp(@RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(authService.loginWithPhoneOtp(
+                body.get("phone"),
+                body.get("otp")
+        ));
+    }
+
     private Map<String, Object> buildUserProfileResponse(User user) {
         Map<String, Object> body = new HashMap<>();
         body.put("id", user.getId());

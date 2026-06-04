@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -57,6 +58,53 @@ public class LeadService {
         }
 
         repo.save(lead);
+    }
+
+    public void saveMockInterviewInterest(Map<String, Object> payload) {
+        if (payload == null) {
+            throw new RuntimeException("Invalid request");
+        }
+
+        String name = readText(payload, "name");
+        String email = readText(payload, "email");
+        String skills = readText(payload, "skills");
+        String interested = readText(payload, "interested");
+        String message = readText(payload, "message");
+
+        if (name.isBlank()) {
+            throw new RuntimeException("Name is required");
+        }
+
+        if (email.isBlank()) {
+            throw new RuntimeException("Email is required");
+        }
+
+        if (skills.isBlank()) {
+            throw new RuntimeException("Skills are required");
+        }
+
+        Lead lead = new Lead();
+        lead.setName(name);
+        lead.setEmail(email);
+        lead.setPhone("");
+        lead.setCourse("Mock Interview Interest");
+        lead.setExperience(skills);
+        lead.setStatus("New");
+        lead.setSource("HOME_MOCK_INTERVIEW_INTEREST");
+        lead.setDeleted(false);
+        lead.setCreatedAt(LocalDateTime.now());
+        lead.setMessage(
+                "Interested: " + (interested.isBlank() ? "Not specified" : interested)
+                        + "\nSkills: " + skills
+                        + (message.isBlank() ? "" : "\nMessage: " + message)
+        );
+
+        repo.save(lead);
+    }
+
+    private String readText(Map<String, Object> payload, String key) {
+        Object value = payload.get(key);
+        return value == null ? "" : String.valueOf(value).trim();
     }
 
     public void savePublicPracticeLead(Lead lead) {

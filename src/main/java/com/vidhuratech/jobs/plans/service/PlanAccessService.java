@@ -20,6 +20,10 @@ public class PlanAccessService {
                 .anyMatch(grant -> Boolean.TRUE.equals(grant.getAccessPremiumChallenges()));
     }
 
+    public boolean hasAnyActivePlan(Long userId, String email) {
+        return !activeGrants(userId, email).isEmpty();
+    }
+
     public boolean hasFeatureAccess(Long userId, String email, String feature) {
         String key = String.valueOf(feature == null ? "" : feature).trim().toUpperCase();
 
@@ -61,5 +65,36 @@ public class PlanAccessService {
         }
 
         return List.of();
+    }
+
+    public boolean hasTierAtLeast(Long userId, String email, String requiredTier) {
+        int requiredRank = tierRank(requiredTier);
+
+        return activeGrants(userId, email)
+                .stream()
+                .anyMatch(grant -> tierRank(resolveTier(grant.getPlanCode(), grant.getPlanName())) >= requiredRank);
+    }
+
+    private String resolveTier(String planCode, String planName) {
+        String text = ((planCode == null ? "" : planCode) + " " + (planName == null ? "" : planName))
+                .trim()
+                .toUpperCase();
+
+        if (text.contains("ELITE")) return "ELITE";
+        if (text.contains("PRO")) return "PRO";
+        if (text.contains("BASIC") || text.contains("STARTER")) return "BASIC";
+
+        return "";
+    }
+
+    private int tierRank(String tier) {
+        if (tier == null) return 0;
+
+        return switch (tier.trim().toUpperCase()) {
+            case "BASIC", "STARTER" -> 1;
+            case "PRO" -> 2;
+            case "ELITE" -> 3;
+            default -> 0;
+        };
     }
 }

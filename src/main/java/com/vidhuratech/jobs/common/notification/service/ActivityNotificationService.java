@@ -30,6 +30,10 @@ public class ActivityNotificationService {
     @Value("${app.frontend-url:http://localhost:4200}")
     private String frontendUrl;
 
+    private boolean canSendActivityNotificationEmail(String email) {
+        return email != null && email.trim().toLowerCase().endsWith("@vidhuratech.com");
+    }
+
     public List<Map<String, Object>> myNotifications() {
         User user = getCurrentUser();
 
@@ -82,6 +86,12 @@ public class ActivityNotificationService {
                 .emailSent(false)
                 .createdAt(LocalDateTime.now())
                 .build());
+
+        if (!canSendActivityNotificationEmail(user.getEmail())) {
+            notification.setEmailSent(false);
+            repo.save(notification);
+            return;
+        }
 
         try {
             sendEmail(user.getEmail(), title, message, link);
@@ -183,7 +193,7 @@ public class ActivityNotificationService {
     }
 
     private void sendEmail(String to, String title, String message, String link) {
-        if (to == null || to.isBlank()) {
+        if (!canSendActivityNotificationEmail(to)) {
             return;
         }
 

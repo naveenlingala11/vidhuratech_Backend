@@ -45,6 +45,10 @@ public class SecurityConfig {
                                 "/api/auth/register/verify",
                                 "/api/auth/resend-link",
                                 "/api/auth/validate-token",
+                                "/api/auth/oauth/google",
+                                "/api/auth/oauth/github",
+                                "/api/auth/phone/send-otp",
+                                "/api/auth/phone/verify-otp",
                                 "/api/public/**",
                                 "/uploads/**",
                                 "/api/public/practice/**",
@@ -67,8 +71,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/trainer/public-curriculum").permitAll()
                         .requestMatchers("/api/checkout/**").permitAll()
                         .requestMatchers("/api/access/**").permitAll()
-                        .requestMatchers("/api/leads/save").permitAll()
-                        .requestMatchers("/api/lms/batches/course/*/active").permitAll()
+                        .requestMatchers("/api/leads/save", "/api/leads/mock-interview-interest" ).permitAll()                        .requestMatchers("/api/lms/batches/course/*/active").permitAll()
                         .requestMatchers("/course-thumbnails/**", "/api/lms/batches/course/*/upcoming").permitAll()
                         .requestMatchers("/api/notifications/**").authenticated()
                         .requestMatchers("/api/leads/**").hasAnyRole("ADMIN", "SUPER_ADMIN")

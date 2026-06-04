@@ -1,6 +1,7 @@
 package com.vidhuratech.jobs.publicpractice.controller;
 
 import com.vidhuratech.jobs.common.api.ApiResponse;
+import com.vidhuratech.jobs.publicpractice.service.PublicChallengeDiscussionService;
 import com.vidhuratech.jobs.publicpractice.service.PublicPracticeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +15,7 @@ import java.util.Map;
 public class PublicPracticeController {
 
     private final PublicPracticeService service;
+    private final PublicChallengeDiscussionService discussionService;
 
     @GetMapping
     public ApiResponse<?> getPracticeLibrary(
@@ -139,6 +141,76 @@ public class PublicPracticeController {
                 .success(true)
                 .message("Practice access unlocked")
                 .data(service.registerAuthenticatedPracticeAccess(payload))
+                .build();
+    }
+
+    @PostMapping("/challenges/{id}/discussions")
+    public ApiResponse<?> getChallengeDiscussions(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> payload
+    ) {
+        return ApiResponse.builder()
+                .success(true)
+                .data(discussionService.listDiscussions(id, payload == null ? Map.of() : payload))
+                .build();
+    }
+
+    @PostMapping("/challenges/{id}/discussions/post")
+    public ApiResponse<?> postChallengeDiscussion(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> payload
+    ) {
+        return ApiResponse.builder()
+                .success(true)
+                .message("Comment posted")
+                .data(discussionService.postDiscussion(id, payload))
+                .build();
+    }
+
+    @PostMapping("/challenges/{id}/discussions/{discussionId}/like")
+    public ApiResponse<?> toggleChallengeDiscussionLike(
+            @PathVariable Long id,
+            @PathVariable Long discussionId,
+            @RequestBody Map<String, Object> payload
+    ) {
+        return ApiResponse.builder()
+                .success(true)
+                .message("Like updated")
+                .data(discussionService.toggleLike(id, discussionId, payload))
+                .build();
+    }
+
+    @GetMapping("/challenges/{id}/best-submissions")
+    public ApiResponse<?> getChallengeBestSubmissions(@PathVariable Long id) {
+        return ApiResponse.builder()
+                .success(true)
+                .data(service.getChallengeBestSubmissions(id))
+                .build();
+    }
+
+    @PostMapping("/challenges/{id}/discussions/{discussionId}/report")
+    public ApiResponse<?> reportChallengeDiscussion(
+            @PathVariable Long id,
+            @PathVariable Long discussionId,
+            @RequestBody Map<String, Object> payload
+    ) {
+        return ApiResponse.builder()
+                .success(true)
+                .message("Comment reported")
+                .data(discussionService.reportDiscussion(id, discussionId, payload))
+                .build();
+    }
+
+    @PostMapping("/challenges/{id}/discussions/{discussionId}/block")
+    public ApiResponse<?> blockChallengeDiscussionAuthor(
+            @PathVariable Long id,
+            @PathVariable Long discussionId,
+            @RequestBody Map<String, Object> payload
+    ) {
+        return ApiResponse.builder()
+                .success(true)
+                .message("User blocked")
+                .data(discussionService.blockDiscussionAuthor(id, discussionId, payload))
                 .build();
     }
 }

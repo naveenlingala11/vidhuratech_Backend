@@ -286,8 +286,11 @@ public class AdminPublicPracticeController {
                 policy("PUBLIC_PREVIEW", "Visible publicly, attempt not allowed"),
                 policy("LEAD_REQUIRED", "Guest must submit registration form before attempt"),
                 policy("ACCOUNT_REQUIRED", "Login account required"),
+                policy("BASIC_PLAN", "Basic, Pro, and Elite plan users can attempt"),
+                policy("PRO_PLAN", "Pro and Elite plan users can attempt"),
+                policy("ELITE_PLAN", "Only Elite plan users can attempt"),
                 policy("ENROLLED_STUDENT_ONLY", "Only enrolled batch students can attempt"),
-                policy("PAID_STUDENT_ONLY", "Only paid students can attempt")
+                policy("PAID_STUDENT_ONLY", "Only active paid users can attempt")
         );
 
         return ApiResponse.success(policies);
@@ -396,20 +399,20 @@ public class AdminPublicPracticeController {
     ) {
         question.setCompany(readText(payload, "companyName", safe(question.getCompany())));
         question.setRole(readText(payload, "skill", safe(question.getRole())));
-        question.setPublicAccessLevel(readText(payload, "accessLevel", "LEAD_REQUIRED"));
+        question.setPublicAccessLevel(resolvePublicAccessLevel(payload, question.getPublicAccessLevel()));
     }
 
     private void applyAssessmentPublicSettings(Assessment assessment, Map<String, Object> payload) {
         assessment.setCompanyName(readText(payload, "companyName", "General"));
         assessment.setSkill(readText(payload, "skill", "Placement Readiness"));
-        assessment.setPublicAccessLevel(readText(payload, "accessLevel", "LEAD_REQUIRED"));
+        assessment.setPublicAccessLevel(resolvePublicAccessLevel(payload, assessment.getPublicAccessLevel()));
         assessment.setPublicAttemptLimit(readInt(payload, "attemptLimit", 1));
     }
 
     private void applyChallengePublicSettings(PseudoCodeChallenge challenge, Map<String, Object> payload) {
         challenge.setCompanyName(readText(payload, "companyName", "General"));
         challenge.setSkill(readText(payload, "skill", "Coding"));
-        challenge.setPublicAccessLevel(readText(payload, "accessLevel", "LEAD_REQUIRED"));
+        challenge.setPublicAccessLevel(resolvePublicAccessLevel(payload, challenge.getPublicAccessLevel()));
         challenge.setPublicAttemptLimit(readInt(payload, "attemptLimit", 1));
     }
 
@@ -421,6 +424,7 @@ public class AdminPublicPracticeController {
                         ? "General"
                         : assessment.getCompanyName()
         ));
+
         assessment.setSkill(readText(
                 payload,
                 "skill",
@@ -428,7 +432,8 @@ public class AdminPublicPracticeController {
                         ? "Placement Readiness"
                         : assessment.getSkill()
         ));
-        assessment.setPublicAccessLevel(readText(payload, "accessLevel", "LEAD_REQUIRED"));
+
+        assessment.setPublicAccessLevel(resolvePublicAccessLevel(payload, assessment.getPublicAccessLevel()));
         assessment.setPublicAttemptLimit(readInt(payload, "attemptLimit", 1));
     }
 
@@ -440,6 +445,7 @@ public class AdminPublicPracticeController {
                         ? "General"
                         : challenge.getCompanyName()
         ));
+
         challenge.setSkill(readText(
                 payload,
                 "skill",
@@ -447,7 +453,8 @@ public class AdminPublicPracticeController {
                         ? "Coding"
                         : challenge.getSkill()
         ));
-        challenge.setPublicAccessLevel(readText(payload, "accessLevel", "LEAD_REQUIRED"));
+
+        challenge.setPublicAccessLevel(resolvePublicAccessLevel(payload, challenge.getPublicAccessLevel()));
         challenge.setPublicAttemptLimit(readInt(payload, "attemptLimit", 1));
     }
 
@@ -637,6 +644,78 @@ public class AdminPublicPracticeController {
 
     private String safe(String value) {
         return value == null ? "" : value;
+    }
+
+    private String resolvePublicAccessLevel(Map<String, Object> payload, String defaultValue) {
+        List<String> selectedLevels = readAccessLevels(payload);
+
+        if (selectedLevels.isEmpty()) {
+            selectedLevels = List.of(readText(payload, "accessLevel", defaultValue == null ? "LEAD_REQUIRED" : defaultValue));
+        }
+
+        return selectedLevels.stream()
+                .map(this::normalizeAccessLevel)
+                .distinct()
+                .max(Comparator.comparingInt(this::accessPriority))
+                .orElse("LEAD_REQUIRED");
+    }
+
+    private List<String> readAccessLevels(Map<String, Object> payload) {
+        if (payload == null) return List.of();
+
+        Object raw = payload.get("accessLevels");
+
+        if (raw instanceof Collection<?> values) {
+            return values.stream()
+                    .map(String::valueOf)
+                    .map(String::trim)
+                    .filter(value -> !value.isBlank())
+                    .toList();
+        }
+
+        if (raw != null && !String.valueOf(raw).isBlank()) {
+            return Arrays.stream(String.valueOf(raw).split(","))
+                    .map(String::trim)
+                    .filter(value -> !value.isBlank())
+                    .toList();
+        }
+
+        return List.of();
+    }
+
+    private String normalizeAccessLevel(String value) {
+        String code = String.valueOf(value == null ? "" : value)
+                .trim()
+                .toUpperCase(Locale.ROOT);
+
+        if (code.contains("ELITE")) return "ELITE_PLAN";
+        if (code.contains("PRO")) return "PRO_PLAN";
+        if (code.contains("BASIC") || code.contains("STARTER")) return "BASIC_PLAN";
+        if (code.equals("PAID") || code.equals("PAID_ONLY") || code.equals("PAID_STUDENT")) {
+            return "PAID_STUDENT_ONLY";
+        }
+        if (code.equals("PUBLIC") || code.equals("PUBLIC_PREVIEW")) return "PUBLIC_PREVIEW";
+        if (code.equals("ACCOUNT") || code.equals("ACCOUNT_REQUIRED")) return "ACCOUNT_REQUIRED";
+        if (code.equals("ENROLLED") || code.equals("ENROLLED_STUDENT")) {
+            return "ENROLLED_STUDENT_ONLY";
+        }
+        if (code.equals("LEAD") || code.equals("LEAD_REQUIRED")) return "LEAD_REQUIRED";
+
+        return "LEAD_REQUIRED";
+    }
+
+    private int accessPriority(String accessLevel) {
+        return switch (normalizeAccessLevel(accessLevel)) {
+            case "PUBLIC_PREVIEW" -> 1;
+            case "LEAD_REQUIRED" -> 2;
+            case "ACCOUNT_REQUIRED" -> 3;
+            case "ENROLLED_STUDENT_ONLY" -> 4;
+            case "PAID_STUDENT_ONLY" -> 5;
+            case "BASIC_PLAN" -> 6;
+            case "PRO_PLAN" -> 7;
+            case "ELITE_PLAN" -> 8;
+            default -> 2;
+        };
     }
 
     private String readText(Map<String, Object> payload, String key, String defaultValue) {

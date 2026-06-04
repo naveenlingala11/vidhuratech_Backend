@@ -13,6 +13,8 @@ public interface PseudoCodeChallengeRepository extends JpaRepository<PseudoCodeC
 
     List<PseudoCodeChallenge> findByBatchIdInAndActiveTrueOrderByCreatedAtDesc(List<Long> batchIds);
 
+    long countByBatchIdInAndActiveTrue(List<Long> batchIds);
+
     List<PseudoCodeChallenge> findByActiveTrueOrderByCreatedAtDesc();
 
     List<PseudoCodeChallenge> findByActiveTrueAndPublicVisibleTrueOrderByPublishedAtDesc();

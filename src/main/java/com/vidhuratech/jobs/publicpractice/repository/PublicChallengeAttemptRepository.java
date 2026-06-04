@@ -43,4 +43,12 @@ public interface PublicChallengeAttemptRepository
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end
     );
+
+    @Query("""
+        select a from PublicChallengeAttempt a
+        where a.challengeId = :challengeId
+          and coalesce(a.percentage, 0) >= 80
+        order by a.percentage desc, a.score desc, a.totalExecutionTimeMs asc, a.submittedAt asc
+        """)
+    List<PublicChallengeAttempt> bestAnswerSubmissions(@Param("challengeId") Long challengeId);
 }
