@@ -394,6 +394,9 @@ public class StudentPseudoCodeChallengeService {
         map.put("durationMinutes", challenge.getDurationMinutes());
         map.put("totalMarks", challenge.getTotalMarks());
         map.put("passPercentage", challenge.getPassPercentage());
+        map.put("skill", challenge.getSkill() == null ? "" : challenge.getSkill());
+        map.put("difficultyLevel", challenge.getDifficultyLevel() == null ? "MEDIUM" : challenge.getDifficultyLevel());
+        map.put("createdAt", challenge.getCreatedAt());
         map.put("rulesCount", challenge.getRules() == null ? 0 : challenge.getRules().size());
         map.put("testCasesCount", challenge.getTestCases() == null ? 0 : challenge.getTestCases().size());
         map.put("attemptCount", attempts.size());

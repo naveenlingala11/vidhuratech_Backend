@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vidhuratech.jobs.common.security.JwtUtil;
 import com.vidhuratech.jobs.common.service.EmailService;
 import com.vidhuratech.jobs.common.service.OTPEmailTemplateService;
+import com.vidhuratech.jobs.common.service.WhatsAppService;
 import com.vidhuratech.jobs.user.dto.AuthResponse;
 import com.vidhuratech.jobs.user.dto.RegisterRequest;
 import com.vidhuratech.jobs.user.entity.User;
@@ -28,6 +29,7 @@ public class OtpService {
     private final JwtUtil jwtUtil;
     private final EmailService emailService;
     private final OTPEmailTemplateService otpEmailTemplateService;
+    private final WhatsAppService whatsAppService;
     private final PasswordEncoder passwordEncoder;
     private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -196,4 +198,57 @@ public class OtpService {
         }
     }
 
+    public void sendPhoneOtp(String phone) {
+        String normalizedPhone = normalizePhone(phone);
+
+        if (normalizedPhone.isBlank()) {
+            throw new RuntimeException("PHONE_REQUIRED");
+        }
+
+        String otp = generateOtp();
+
+        redisTemplate.opsForValue()
+                .set("PHONE_OTP:" + normalizedPhone, otp, OTP_TTL, TimeUnit.MINUTES);
+
+        log.info("Phone OTP for {} is {}", normalizedPhone, otp);
+
+        whatsAppService.sendText(
+                normalizedPhone,
+                "Your Vidhura Tech login OTP is " + otp + ". It is valid for 5 minutes."
+        );
+    }
+
+    public void verifyPhoneOtpOrThrow(String phone, String otp) {
+        String normalizedPhone = normalizePhone(phone);
+
+        String storedOtp = redisTemplate.opsForValue().get("PHONE_OTP:" + normalizedPhone);
+
+        if (storedOtp == null) {
+            throw new RuntimeException("OTP expired");
+        }
+
+        if (!storedOtp.equals(otp)) {
+            throw new RuntimeException("Invalid OTP");
+        }
+
+        redisTemplate.delete("PHONE_OTP:" + normalizedPhone);
+    }
+
+    private String normalizePhone(String phone) {
+        if (phone == null) {
+            return "";
+        }
+
+        String digits = phone.replaceAll("\\D", "");
+
+        if (digits.length() == 12 && digits.startsWith("91")) {
+            digits = digits.substring(2);
+        }
+
+        if (digits.length() != 10) {
+            throw new RuntimeException("INVALID_PHONE");
+        }
+
+        return digits;
+    }
 }

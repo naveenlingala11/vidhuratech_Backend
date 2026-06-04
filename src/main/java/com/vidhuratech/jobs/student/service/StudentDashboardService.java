@@ -7,6 +7,7 @@ import com.vidhuratech.jobs.student.dto.StudentDashboardResponseDTO;
 import com.vidhuratech.jobs.trainer.dto.TrainingContentDTO;
 import com.vidhuratech.jobs.trainer.entity.TrainingContent;
 import com.vidhuratech.jobs.trainer.repository.AssessmentRepository;
+import com.vidhuratech.jobs.trainer.repository.PseudoCodeChallengeRepository;
 import com.vidhuratech.jobs.trainer.repository.TrainingContentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -23,6 +24,7 @@ public class StudentDashboardService {
     private final BatchEnrollmentRepository enrollmentRepository;
     private final AssessmentRepository assessmentRepository;
     private final TrainingContentRepository contentRepository;
+    private final PseudoCodeChallengeRepository pseudoCodeChallengeRepository;
 
     @Transactional(readOnly = true)
     public StudentDashboardResponseDTO getDashboard() {
@@ -117,6 +119,7 @@ public class StudentDashboardService {
         long practiceItems = 0;
         long materials = 0;
         long notes = 0;
+        long pseudoChallenges = 0;
 
         if (!batchIds.isEmpty()) {
             List<TrainingContent> content = contentRepository.findByBatchIdInOrderByCreatedAtDesc(batchIds);
@@ -124,6 +127,7 @@ public class StudentDashboardService {
             practiceItems = content.stream().filter(item -> item.getType().name().equals("PRACTICE")).count();
             materials = content.stream().filter(item -> item.getType().name().equals("MATERIAL")).count();
             notes = content.stream().filter(item -> item.getType().name().equals("NOTE")).count();
+            pseudoChallenges = pseudoCodeChallengeRepository.countByBatchIdInAndActiveTrue(batchIds);
         }
 
         Map<String, Object> stats =
@@ -143,6 +147,7 @@ public class StudentDashboardService {
         stats.put("practiceItems", practiceItems);
         stats.put("materials", materials);
         stats.put("notes", notes);
+        stats.put("pseudoChallenges", pseudoChallenges);
 
         stats.put(
                 "assessmentsUpcoming",

@@ -31,6 +31,16 @@ public class LeadController {
         }
     }
 
+    @PostMapping("/mock-interview-interest")
+    public ResponseEntity<?> saveMockInterviewInterest(@RequestBody Map<String, Object> payload) {
+        try {
+            service.saveMockInterviewInterest(payload);
+            return ResponseEntity.ok(Map.of("message", "Saved"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     // 🔥 ADMIN UPDATE STATUS
     @PostMapping("/status")
     public void updateStatus(@RequestParam String phone,

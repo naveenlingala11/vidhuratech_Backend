@@ -49,6 +49,7 @@ public class PublicPracticeService {
     );
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final int PUBLIC_PRACTICE_ATTEMPT_LIMIT = 100;
 
     private final PublicPracticeAccessGrantRepository grantRepository;
     private final PublicAssessmentAttemptRepository publicAssessmentAttemptRepository;
@@ -635,7 +636,7 @@ public class PublicPracticeService {
         }
 
         String accessLevel;
-        int attemptLimit;
+        int attemptLimit = PUBLIC_PRACTICE_ATTEMPT_LIMIT;
 
         if (practiceType.equals("ASSESSMENT")) {
             Assessment assessment = assessmentRepository.findById(practiceId)
@@ -646,7 +647,6 @@ public class PublicPracticeService {
             }
 
             accessLevel = assessment.getPublicAccessLevel();
-            attemptLimit = assessment.getPublicAttemptLimit() == null ? 1 : assessment.getPublicAttemptLimit();
         } else {
             PseudoCodeChallenge challenge = challengeRepository.findById(practiceId)
                     .orElseThrow(() -> new RuntimeException("Challenge not found"));
@@ -656,7 +656,6 @@ public class PublicPracticeService {
             }
 
             accessLevel = challenge.getPublicAccessLevel();
-            attemptLimit = challenge.getPublicAttemptLimit() == null ? 1 : challenge.getPublicAttemptLimit();
         }
 
         if (!"LEAD_REQUIRED".equalsIgnoreCase(accessLevel)) {
@@ -1421,7 +1420,7 @@ public class PublicPracticeService {
         }
 
         String accessLevel;
-        int attemptLimit;
+        int attemptLimit = PUBLIC_PRACTICE_ATTEMPT_LIMIT;
         String requiredFeature;
 
         if (practiceType.equals("ASSESSMENT")) {
@@ -1434,9 +1433,6 @@ public class PublicPracticeService {
             }
 
             accessLevel = assessment.getPublicAccessLevel();
-            attemptLimit = assessment.getPublicAttemptLimit() == null
-                    ? 1
-                    : assessment.getPublicAttemptLimit();
             requiredFeature = "MOCK_TESTS";
 
         } else if (practiceType.equals("CHALLENGE")) {
@@ -1449,9 +1445,6 @@ public class PublicPracticeService {
             }
 
             accessLevel = challenge.getPublicAccessLevel();
-            attemptLimit = challenge.getPublicAttemptLimit() == null
-                    ? 1
-                    : challenge.getPublicAttemptLimit();
             requiredFeature = "PREMIUM_CHALLENGES";
 
         } else {
@@ -1464,7 +1457,6 @@ public class PublicPracticeService {
             }
 
             accessLevel = question.getPublicAccessLevel();
-            attemptLimit = 1;
             requiredFeature = "INTERVIEWS";
         }
 
@@ -1518,12 +1510,32 @@ public class PublicPracticeService {
                 .trim()
                 .toUpperCase();
 
-        if (level.equals("LEAD_REQUIRED") || level.equals("PUBLIC")) {
+        if (level.equals("PUBLIC_PREVIEW") || level.equals("LEAD_REQUIRED") || level.equals("PUBLIC")) {
             return;
         }
 
         if (level.equals("ACCOUNT_REQUIRED") || level.equals("ENROLLED_STUDENT_ONLY")) {
             return;
+        }
+
+        if (level.equals("BASIC_PLAN")) {
+            if (planAccessService.hasTierAtLeast(userId, email, "BASIC")) return;
+            throw new PracticeAccessRequiredException(premiumAccessMessage(requiredFeature, practiceType));
+        }
+
+        if (level.equals("PRO_PLAN")) {
+            if (planAccessService.hasTierAtLeast(userId, email, "PRO")) return;
+            throw new PracticeAccessRequiredException(premiumAccessMessage(requiredFeature, practiceType));
+        }
+
+        if (level.equals("ELITE_PLAN")) {
+            if (planAccessService.hasTierAtLeast(userId, email, "ELITE")) return;
+            throw new PracticeAccessRequiredException(premiumAccessMessage(requiredFeature, practiceType));
+        }
+
+        if (level.equals("PAID_STUDENT_ONLY")) {
+            if (planAccessService.hasAnyActivePlan(userId, email)) return;
+            throw new PracticeAccessRequiredException(premiumAccessMessage(requiredFeature, practiceType));
         }
 
         if (requiresPaidPlan(level)) {
@@ -1533,13 +1545,9 @@ public class PublicPracticeService {
                 allowed = planAccessService.hasPremiumChallengeAccess(userId, email);
             }
 
-            if (allowed) {
-                return;
-            }
+            if (allowed) return;
 
-            throw new PracticeAccessRequiredException(
-                    premiumAccessMessage(requiredFeature, practiceType)
-            );
+            throw new PracticeAccessRequiredException(premiumAccessMessage(requiredFeature, practiceType));
         }
 
         throw new PracticeAccessRequiredException(
@@ -1553,6 +1561,9 @@ public class PublicPracticeService {
                 .toUpperCase();
 
         return level.equals("PAID_STUDENT_ONLY")
+                || level.equals("BASIC_PLAN")
+                || level.equals("PRO_PLAN")
+                || level.equals("ELITE_PLAN")
                 || level.equals("PREMIUM")
                 || level.equals("PRO_ONLY")
                 || level.equals("ELITE_ONLY");
@@ -1579,20 +1590,92 @@ public class PublicPracticeService {
         };
     }
 
-    private boolean canAccessByPolicy(String policy, UserPlanAccessDto access, boolean loggedIn, boolean leadSubmitted) {
-        String code = policy == null ? "LEAD_REQUIRED" : policy.trim().toUpperCase();
+    @Transactional(readOnly = true)
+    public Map<String, Object> getChallengeBestSubmissions(Long challengeId) {
+        Long userId = securityUtils.getCurrentUserId();
 
-        return switch (code) {
-            case "PUBLIC_PREVIEW" -> true;
-            case "LEAD_REQUIRED" -> leadSubmitted || loggedIn;
-            case "ACCOUNT_REQUIRED" -> loggedIn;
-            case "BASIC_PLAN" -> hasTierAtLeast(access, "BASIC");
-            case "PRO_PLAN" -> hasTierAtLeast(access, "PRO");
-            case "ELITE_PLAN" -> hasTierAtLeast(access, "ELITE");
-            case "ENROLLED_STUDENT_ONLY" -> access != null && access.isEnrolledStudent();
-            case "PAID_STUDENT_ONLY" -> access != null && access.isActive();
-            default -> false;
-        };
+        if (userId == null) {
+            throw new PracticeAccessRequiredException("Please purchase any plan to unlock best answers");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new PracticeAccessRequiredException("Please purchase any plan to unlock best answers"));
+
+        if (!planAccessService.hasAnyActivePlan(user.getId(), user.getEmail())) {
+            throw new PracticeAccessRequiredException("Please purchase any plan to unlock best answers");
+        }
+
+        PseudoCodeChallenge challenge = challengeRepository.findById(challengeId)
+                .orElseThrow(() -> new RuntimeException("Challenge not found"));
+
+        List<PublicChallengeAttempt> attempts =
+                publicChallengeAttemptRepository.bestAnswerSubmissions(challengeId);
+
+        Map<String, PublicChallengeAttempt> bestByParticipant = new LinkedHashMap<>();
+
+        for (PublicChallengeAttempt attempt : attempts) {
+            String key = participantKey(attempt);
+            PublicChallengeAttempt existing = bestByParticipant.get(key);
+
+            if (existing == null || isBetterAttempt(attempt, existing)) {
+                bestByParticipant.put(key, attempt);
+            }
+        }
+
+        List<PublicChallengeAttempt> sorted = bestByParticipant.values()
+                .stream()
+                .sorted((a, b) -> {
+                    int percentageCompare = Integer.compare(
+                            b.getPercentage() == null ? 0 : b.getPercentage(),
+                            a.getPercentage() == null ? 0 : a.getPercentage()
+                    );
+                    if (percentageCompare != 0) return percentageCompare;
+
+                    int scoreCompare = Integer.compare(
+                            b.getScore() == null ? 0 : b.getScore(),
+                            a.getScore() == null ? 0 : a.getScore()
+                    );
+                    if (scoreCompare != 0) return scoreCompare;
+
+                    return Long.compare(
+                            a.getTotalExecutionTimeMs() == null ? Long.MAX_VALUE : a.getTotalExecutionTimeMs(),
+                            b.getTotalExecutionTimeMs() == null ? Long.MAX_VALUE : b.getTotalExecutionTimeMs()
+                    );
+                })
+                .limit(30)
+                .toList();
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+
+        for (int i = 0; i < sorted.size(); i++) {
+            PublicChallengeAttempt attempt = sorted.get(i);
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("rank", i + 1);
+            row.put("attemptId", attempt.getId());
+            row.put("challengeId", attempt.getChallengeId());
+            row.put("name", maskName(attempt.getParticipantName()));
+            row.put("email", maskEmail(attempt.getParticipantEmail()));
+            row.put("score", attempt.getScore() == null ? 0 : attempt.getScore());
+            row.put("totalMarks", attempt.getTotalMarks() == null ? 0 : attempt.getTotalMarks());
+            row.put("percentage", attempt.getPercentage() == null ? 0 : attempt.getPercentage());
+            row.put("status", attempt.getStatus());
+            row.put("language", attempt.getLanguage());
+            row.put("sourceCode", attempt.getSourceCode() == null ? "" : attempt.getSourceCode());
+            row.put("totalExecutionTimeMs", attempt.getTotalExecutionTimeMs() == null ? 0 : attempt.getTotalExecutionTimeMs());
+            row.put("submittedAt", attempt.getSubmittedAt());
+
+            rows.add(row);
+        }
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("challengeId", challenge.getId());
+        response.put("title", safe(challenge.getTitle()));
+        response.put("totalMarks", challenge.getTotalMarks() == null ? 0 : challenge.getTotalMarks());
+        response.put("minimumPercentage", 80);
+        response.put("entries", rows);
+
+        return response;
     }
 
     private boolean hasTierAtLeast(UserPlanAccessDto access, String requiredTier) {
