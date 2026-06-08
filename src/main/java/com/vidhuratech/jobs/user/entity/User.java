@@ -43,4 +43,7 @@ public class User {
 
     @Column(nullable = false)
     private Boolean notificationsEnabled = true;
+
+    @Column(length = 1000)
+    private String profileImageUrl;
 }

@@ -24,6 +24,9 @@ public class PublicChallengeDiscussion {
     @Column(length = 180)
     private String authorEmail;
 
+    @Column(length = 1000)
+    private String authorProfileImageUrl;
+
     @Column(length = 140)
     private String authorKey;
 

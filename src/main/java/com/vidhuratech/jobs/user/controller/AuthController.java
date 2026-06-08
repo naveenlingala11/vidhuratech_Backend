@@ -39,7 +39,6 @@ public class AuthController {
     @Value("${app.frontend-url}")
     private String frontendUrl;
 
-
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@RequestBody RegisterRequest req) {
         return ResponseEntity.ok(authService.register(req));
@@ -50,12 +49,11 @@ public class AuthController {
         return ResponseEntity.ok(authService.login(req));
     }
 
-    // ✅ SET PASSWORD
     @PostMapping("/set-password")
     public ResponseEntity<?> setPassword(
             @RequestParam String token,
-            @RequestParam String password) {
-
+            @RequestParam String password
+    ) {
         PasswordResetToken t = tokenRepo.findByToken(token)
                 .orElseThrow(() -> new RuntimeException("Invalid token"));
 
@@ -68,10 +66,11 @@ public class AuthController {
         }
 
         User user = userRepo.findByEmail(t.getEmail())
-                .orElseThrow();
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
         user.setPassword(passwordEncoder.encode(password));
         user.setFirstLogin(false);
+        user.setUpdatedAt(LocalDateTime.now());
 
         userRepo.save(user);
 
@@ -81,25 +80,22 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("message", "Password set successfully"));
     }
 
-    // ✅ SEND OTP
     @PostMapping("/send-otp")
     public ResponseEntity<?> sendOtp(@RequestParam String email) {
         otpService.sendOtp(email);
         return ResponseEntity.ok("OTP sent");
     }
 
-    // ✅ VERIFY OTP
     @PostMapping("/verify-otp")
     public ResponseEntity<AuthResponse> verifyOtp(
             @RequestParam String email,
-            @RequestParam String otp) {
-
+            @RequestParam String otp
+    ) {
         return ResponseEntity.ok(otpService.verifyOtp(email, otp));
     }
 
     @PostMapping("/register/init")
     public ResponseEntity<?> initRegister(@RequestBody RegisterRequest req) {
-
         if (userRepo.existsByEmail(req.getEmail())) {
             return ResponseEntity.badRequest()
                     .body(Map.of("message", "Email already registered"));
@@ -113,24 +109,20 @@ public class AuthController {
     @PostMapping("/register/verify")
     public ResponseEntity<AuthResponse> verifyRegister(
             @RequestParam String email,
-            @RequestParam String otp) {
-
-        return ResponseEntity.ok(
-                otpService.verifyRegistrationOtp(email, otp)
-        );
+            @RequestParam String otp
+    ) {
+        return ResponseEntity.ok(otpService.verifyRegistrationOtp(email, otp));
     }
 
     @PostMapping("/resend-link")
     public ResponseEntity<?> resendLink(@RequestBody Map<String, String> body) {
-
         String token = body.get("token");
         String email = body.get("email");
 
         PasswordResetToken oldToken = null;
 
         if (token != null && !token.isBlank()) {
-            oldToken = tokenRepo.findByToken(token)
-                    .orElse(null);
+            oldToken = tokenRepo.findByToken(token).orElse(null);
 
             if (oldToken == null) {
                 return ResponseEntity.badRequest()
@@ -183,19 +175,13 @@ public class AuthController {
                 html
         );
 
-        return ResponseEntity.ok(Map.of(
-                "message", "Password reset link sent"
-        ));
+        return ResponseEntity.ok(Map.of("message", "Password reset link sent"));
     }
-
-
 
     @GetMapping("/validate-token")
     public ResponseEntity<?> validateToken(@RequestParam String token) {
-
         return tokenRepo.findByToken(token)
                 .map(t -> {
-
                     if (t.isExpired()) {
                         return ResponseEntity.badRequest()
                                 .body(Map.of("message", "expired"));
@@ -219,16 +205,7 @@ public class AuthController {
         User user = userRepo.findByEmail(authentication.getName())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        Map<String, Object> body = new HashMap<>();
-        body.put("id", user.getId());
-        body.put("name", user.getName() == null ? "" : user.getName());
-        body.put("email", user.getEmail() == null ? "" : user.getEmail());
-        body.put("phone", user.getPhone() == null ? "" : user.getPhone());
-        body.put("role", user.getRole() == null ? "" : user.getRole().name());
-        body.put("active", Boolean.TRUE.equals(user.getActive()));
-        body.put("firstLogin", Boolean.TRUE.equals(user.getFirstLogin()));
-
-        return ResponseEntity.ok(body);
+        return ResponseEntity.ok(buildUserProfileResponse(user));
     }
 
     @PutMapping("/me")
@@ -249,16 +226,7 @@ public class AuthController {
 
         userRepo.save(user);
 
-        Map<String, Object> body = new HashMap<>();
-        body.put("id", user.getId());
-        body.put("name", user.getName() == null ? "" : user.getName());
-        body.put("email", user.getEmail() == null ? "" : user.getEmail());
-        body.put("phone", user.getPhone() == null ? "" : user.getPhone());
-        body.put("role", user.getRole() == null ? "" : user.getRole().name());
-        body.put("active", Boolean.TRUE.equals(user.getActive()));
-        body.put("firstLogin", Boolean.TRUE.equals(user.getFirstLogin()));
-
-        return ResponseEntity.ok(body);
+        return ResponseEntity.ok(buildUserProfileResponse(user));
     }
 
     @PutMapping("/change-password")
@@ -359,6 +327,7 @@ public class AuthController {
 
     private Map<String, Object> buildUserProfileResponse(User user) {
         Map<String, Object> body = new HashMap<>();
+
         body.put("id", user.getId());
         body.put("name", user.getName() == null ? "" : user.getName());
         body.put("email", user.getEmail() == null ? "" : user.getEmail());
@@ -366,6 +335,8 @@ public class AuthController {
         body.put("role", user.getRole() == null ? "" : user.getRole().name());
         body.put("active", Boolean.TRUE.equals(user.getActive()));
         body.put("firstLogin", Boolean.TRUE.equals(user.getFirstLogin()));
+        body.put("profileImageUrl", user.getProfileImageUrl() == null ? "" : user.getProfileImageUrl());
+
         return body;
     }
 }

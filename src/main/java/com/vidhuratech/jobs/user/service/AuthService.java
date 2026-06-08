@@ -45,18 +45,21 @@ public class AuthService {
     private String githubClientSecret;
 
     public AuthResponse register(RegisterRequest request) {
-        if (userRepo.existsByEmail(request.getEmail())) {
+        String email = normalizeEmail(request.getEmail());
+
+        if (userRepo.existsByEmail(email)) {
             throw new RuntimeException("EMAIL_ALREADY_EXISTS");
         }
 
         User user = new User();
         user.setName(request.getName());
-        user.setEmail(request.getEmail());
+        user.setEmail(email);
         user.setPhone(request.getPhone());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRole(UserRole.STUDENT);
         user.setActive(true);
         user.setFirstLogin(false);
+        user.setCreatedAt(LocalDateTime.now());
 
         userRepo.save(user);
 
@@ -64,7 +67,7 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest req) {
-        User user = userRepo.findByEmail(req.getEmail())
+        User user = userRepo.findByEmail(normalizeEmail(req.getEmail()))
                 .orElseThrow(() -> new RuntimeException("USER_NOT_FOUND"));
 
         if (!passwordEncoder.matches(req.getPassword(), user.getPassword())) {
@@ -107,12 +110,13 @@ public class AuthService {
 
             String email = text(node, "email");
             String name = text(node, "name");
+            String picture = text(node, "picture");
 
             if (email.isBlank()) {
                 throw new RuntimeException("GOOGLE_EMAIL_REQUIRED");
             }
 
-            return loginOrCreateSocialUser(email, name, "");
+            return loginOrCreateSocialUser(email, name, "", picture);
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
@@ -122,7 +126,8 @@ public class AuthService {
 
     public AuthResponse loginWithGithub(String code, String redirectUri) {
         try {
-            if (githubClientId == null || githubClientId.isBlank() || githubClientSecret == null || githubClientSecret.isBlank()) {
+            if (githubClientId == null || githubClientId.isBlank()
+                    || githubClientSecret == null || githubClientSecret.isBlank()) {
                 throw new RuntimeException("GITHUB_OAUTH_NOT_CONFIGURED");
             }
 
@@ -139,6 +144,11 @@ public class AuthService {
                     .build();
 
             HttpResponse<String> tokenResponse = httpClient.send(tokenRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (tokenResponse.statusCode() >= 400) {
+                throw new RuntimeException("GITHUB_TOKEN_FAILED");
+            }
+
             JsonNode tokenJson = mapper.readTree(tokenResponse.body());
 
             String accessToken = text(tokenJson, "access_token");
@@ -150,9 +160,11 @@ public class AuthService {
             JsonNode emails = githubGet("https://api.github.com/user/emails", accessToken);
 
             String email = "";
-            if (emails.isArray()) {
+
+            if (emails != null && emails.isArray()) {
                 for (JsonNode item : emails) {
-                    if (item.path("primary").asBoolean(false) && item.path("verified").asBoolean(false)) {
+                    if (item.path("primary").asBoolean(false)
+                            && item.path("verified").asBoolean(false)) {
                         email = text(item, "email");
                         break;
                     }
@@ -161,6 +173,11 @@ public class AuthService {
 
             if (email.isBlank()) {
                 String id = text(profile, "id");
+
+                if (id.isBlank()) {
+                    throw new RuntimeException("GITHUB_PROFILE_INVALID");
+                }
+
                 email = "github-" + id + "@github.vidhuratech.local";
             }
 
@@ -169,7 +186,9 @@ public class AuthService {
                 name = text(profile, "login");
             }
 
-            return loginOrCreateSocialUser(email, name, "");
+            String avatarUrl = text(profile, "avatar_url");
+
+            return loginOrCreateSocialUser(email, name, "", avatarUrl);
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
@@ -192,8 +211,14 @@ public class AuthService {
         return buildAuthResponse(user, jwtUtil.generateToken(user));
     }
 
-    private AuthResponse loginOrCreateSocialUser(String email, String name, String phone) {
-        String normalizedEmail = email.trim().toLowerCase();
+    private AuthResponse loginOrCreateSocialUser(String email, String name, String phone, String profileImageUrl) {
+        String normalizedEmail = normalizeEmail(email);
+
+        if (normalizedEmail.isBlank()) {
+            throw new RuntimeException("EMAIL_REQUIRED");
+        }
+
+        String safeImageUrl = safeProfileImageUrl(profileImageUrl);
 
         User user = userRepo.findByEmail(normalizedEmail)
                 .orElseGet(() -> {
@@ -206,8 +231,16 @@ public class AuthService {
                     newUser.setActive(true);
                     newUser.setFirstLogin(false);
                     newUser.setCreatedAt(LocalDateTime.now());
+                    newUser.setProfileImageUrl(safeImageUrl);
                     return userRepo.save(newUser);
                 });
+
+        if (!safeImageUrl.isBlank()
+                && (user.getProfileImageUrl() == null || !safeImageUrl.equals(user.getProfileImageUrl()))) {
+            user.setProfileImageUrl(safeImageUrl);
+            user.setUpdatedAt(LocalDateTime.now());
+            user = userRepo.save(user);
+        }
 
         if (Boolean.FALSE.equals(user.getActive())) {
             throw new RuntimeException("ACCOUNT_INACTIVE");
@@ -238,6 +271,11 @@ public class AuthService {
                 .build();
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() >= 400) {
+            throw new RuntimeException("GITHUB_API_FAILED");
+        }
+
         return mapper.readTree(response.body());
     }
 
@@ -251,7 +289,32 @@ public class AuthService {
                 .role(user.getRole())
                 .active(user.getActive())
                 .firstLogin(Boolean.TRUE.equals(user.getFirstLogin()))
+                .profileImageUrl(user.getProfileImageUrl() == null ? "" : user.getProfileImageUrl())
                 .build();
+    }
+
+    private String safeProfileImageUrl(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+
+        String url = value.trim();
+
+        if (url.length() > 1000) {
+            return "";
+        }
+
+        try {
+            URI uri = URI.create(url);
+
+            if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null) {
+                return "";
+            }
+
+            return uri.toString();
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     private String text(JsonNode node, String field) {
@@ -260,6 +323,10 @@ public class AuthService {
 
     private String encode(String value) {
         return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase();
     }
 
     private String normalizePhone(String phone) {
