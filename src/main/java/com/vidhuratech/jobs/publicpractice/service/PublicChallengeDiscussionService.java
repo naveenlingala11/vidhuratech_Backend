@@ -76,6 +76,7 @@ public class PublicChallengeDiscussionService {
         discussion.setParentId(parentId);
         discussion.setAuthorName(actor.name());
         discussion.setAuthorEmail(actor.email());
+        discussion.setAuthorProfileImageUrl(actor.profileImageUrl());
         discussion.setAuthorKey(actor.key());
         discussion.setComment(commentText);
         discussion.setLikeCount(0);
@@ -180,6 +181,8 @@ public class PublicChallengeDiscussionService {
         map.put("parentId", comment.getParentId());
         map.put("authorName", safe(comment.getAuthorName(), "Learner"));
         map.put("authorKey", comment.getAuthorKey());
+        map.put("authorProfileImageUrl", safeProfileImageUrl(comment.getAuthorProfileImageUrl()));
+        map.put("profileImageUrl", safeProfileImageUrl(comment.getAuthorProfileImageUrl()));
         map.put("comment", safe(comment.getComment(), ""));
         map.put("likeCount", comment.getLikeCount() == null ? 0 : comment.getLikeCount());
         map.put("reportCount", comment.getReportCount() == null ? 0 : comment.getReportCount());
@@ -260,6 +263,7 @@ public class PublicChallengeDiscussionService {
 
     private Map<String, Object> toMap(PublicChallengeDiscussion comment, String viewerKey) {
         Map<String, Object> map = new LinkedHashMap<>();
+        String profileImageUrl = discussionProfileImageUrl(comment);
 
         boolean likedByMe = viewerKey != null
                 && likeRepository.findByDiscussionIdAndLikerKey(comment.getId(), viewerKey).isPresent();
@@ -267,12 +271,34 @@ public class PublicChallengeDiscussionService {
         map.put("id", comment.getId());
         map.put("challengeId", comment.getChallengeId());
         map.put("authorName", safe(comment.getAuthorName(), "Learner"));
+        map.put("authorProfileImageUrl", profileImageUrl);
+        map.put("profileImageUrl", profileImageUrl);
+        map.put("picture", profileImageUrl);
         map.put("comment", safe(comment.getComment(), ""));
         map.put("likeCount", comment.getLikeCount() == null ? 0 : comment.getLikeCount());
         map.put("likedByMe", likedByMe);
         map.put("createdAt", comment.getCreatedAt());
 
         return map;
+    }
+
+    private String discussionProfileImageUrl(PublicChallengeDiscussion comment) {
+        String stored = safeProfileImageUrl(comment.getAuthorProfileImageUrl());
+
+        if (!stored.isBlank()) {
+            return stored;
+        }
+
+        String email = comment.getAuthorEmail();
+
+        if (email == null || email.isBlank()) {
+            return "";
+        }
+
+        return userRepository.findByEmail(email.trim().toLowerCase())
+                .map(User::getProfileImageUrl)
+                .map(this::safeProfileImageUrl)
+                .orElse("");
     }
 
     private Actor resolveActor(Map<String, Object> payload) {
@@ -284,7 +310,22 @@ public class PublicChallengeDiscussionService {
             if (user != null) {
                 String name = safe(user.getName(), user.getEmail());
                 String email = safe(user.getEmail(), "");
-                return new Actor("USER:" + user.getId(), name, email);
+
+                String profileImageUrl = firstSafeProfileImageUrl(
+                        user.getProfileImageUrl(),
+                        readText(payload, "authorProfileImageUrl"),
+                        readText(payload, "profileImageUrl"),
+                        readText(payload, "userProfileImageUrl"),
+                        readText(payload, "imageUrl"),
+                        readText(payload, "photoURL"),
+                        readText(payload, "photoUrl"),
+                        readText(payload, "picture"),
+                        readText(payload, "avatarUrl"),
+                        readText(payload, "imageUrl"),
+                        readText(payload, "photoURL")
+                );
+
+                return new Actor("USER:" + user.getId(), name, email, profileImageUrl);
             }
         }
 
@@ -302,7 +343,17 @@ public class PublicChallengeDiscussionService {
 
         String email = readText(payload, "authorEmail");
 
-        return new Actor("GUEST:" + sha256(accessToken), name, email);
+        String profileImageUrl = firstSafeProfileImageUrl(
+                readText(payload, "authorProfileImageUrl"),
+                readText(payload, "profileImageUrl"),
+                readText(payload, "userProfileImageUrl"),
+                readText(payload, "avatarUrl"),
+                readText(payload, "photoUrl"),
+                readText(payload, "picture"),
+                readText(payload, "imageUrl")
+        );
+
+        return new Actor("GUEST:" + sha256(accessToken), name, email, profileImageUrl);
     }
 
     private String resolveViewerKey(Map<String, Object> payload, boolean required) {
@@ -338,6 +389,32 @@ public class PublicChallengeDiscussionService {
         return value == null || value.isBlank() ? fallback : value.trim();
     }
 
+    private String safeProfileImageUrl(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+
+        String url = value.trim();
+
+        if (url.length() > 1000) {
+            return "";
+        }
+
+        return url.startsWith("https://") ? url : "";
+    }
+
+    private String firstSafeProfileImageUrl(String... values) {
+        for (String value : values) {
+            String safeUrl = safeProfileImageUrl(value);
+
+            if (!safeUrl.isBlank()) {
+                return safeUrl;
+            }
+        }
+
+        return "";
+    }
+
     private String sha256(String value) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -355,6 +432,6 @@ public class PublicChallengeDiscussionService {
         }
     }
 
-    private record Actor(String key, String name, String email) {
+    private record Actor(String key, String name, String email, String profileImageUrl) {
     }
 }

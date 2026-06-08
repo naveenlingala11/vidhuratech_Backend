@@ -16,4 +16,5 @@ public class AuthResponse {
     private String phone;
     private Boolean active;
     private boolean firstLogin;
+    private String profileImageUrl;
 }

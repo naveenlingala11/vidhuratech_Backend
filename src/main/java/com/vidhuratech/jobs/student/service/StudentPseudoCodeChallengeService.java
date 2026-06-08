@@ -1,6 +1,7 @@
 package com.vidhuratech.jobs.student.service;
 
 import com.vidhuratech.jobs.common.security.SecurityUtils;
+import com.vidhuratech.jobs.lms.batch.entity.Batch;
 import com.vidhuratech.jobs.lms.batch.entity.BatchEnrollment;
 import com.vidhuratech.jobs.lms.batch.repository.BatchEnrollmentRepository;
 import com.vidhuratech.jobs.trainer.entity.*;
@@ -27,6 +28,7 @@ public class StudentPseudoCodeChallengeService {
     private final SecurityUtils securityUtils;
     private final CodeExecutionService codeExecutionService;
     private final PseudoCodeDraftRepository draftRepository;
+    private final CodeSecurityValidator codeSecurityValidator;
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getStudentChallenges() {
@@ -35,7 +37,7 @@ public class StudentPseudoCodeChallengeService {
         List<Long> batchIds = batchEnrollmentRepository.findActiveByStudentEmail(student.getEmail())
                 .stream()
                 .map(BatchEnrollment::getBatch)
-                .map(batch -> batch.getId())
+                .map(Batch::getId)
                 .toList();
 
         if (batchIds.isEmpty()) {
@@ -134,26 +136,11 @@ public class StudentPseudoCodeChallengeService {
         String language = String.valueOf(payload.getOrDefault("language", "")).trim().toUpperCase();
         String sourceCode = String.valueOf(payload.getOrDefault("sourceCode", ""));
 
-        if (!Set.of(
-                "JAVA",
-                "PYTHON",
-                "C",
-                "CPP",
-                "CSHARP",
-                "FSHARP",
-                "PHP",
-                "RUBY",
-                "HASKELL",
-                "GO",
-                "RUST",
-                "TYPESCRIPT"
-        ).contains(language)) {
+        if (!supportedLanguage(language)) {
             throw new RuntimeException("Unsupported language");
         }
 
-        if (sourceCode.trim().isEmpty()) {
-            throw new RuntimeException("Source code is required");
-        }
+        codeSecurityValidator.validate(language, sourceCode);
 
         int score = 0;
         int total = challenge.getTotalMarks() == null ? 0 : challenge.getTotalMarks();
@@ -236,8 +223,14 @@ public class StudentPseudoCodeChallengeService {
         PseudoCodeChallenge challenge = challengeRepository.findById(challengeId)
                 .orElseThrow(() -> new RuntimeException("Challenge not found"));
 
-        String language = String.valueOf(payload.get("language"));
+        String language = String.valueOf(payload.get("language")).trim().toUpperCase();
         String sourceCode = String.valueOf(payload.get("sourceCode"));
+
+        if (!supportedLanguage(language)) {
+            throw new RuntimeException("Unsupported language");
+        }
+
+        codeSecurityValidator.validate(language, sourceCode);
 
         PseudoCodeDraft draft = PseudoCodeDraft.builder()
                 .challenge(challenge)
@@ -266,6 +259,12 @@ public class StudentPseudoCodeChallengeService {
 
         String language = String.valueOf(payload.get("language")).trim().toUpperCase();
         String sourceCode = String.valueOf(payload.get("sourceCode"));
+
+        if (!supportedLanguage(language)) {
+            throw new RuntimeException("Unsupported language");
+        }
+
+        codeSecurityValidator.validate(language, sourceCode);
 
         List<Map<String, Object>> results = new ArrayList<>();
 
@@ -383,7 +382,7 @@ public class StudentPseudoCodeChallengeService {
                         student.getId()
                 );
 
-        PseudoCodeAttempt latest = attempts.isEmpty() ? null : attempts.get(0);
+        PseudoCodeAttempt latest = attempts.isEmpty() ? null : attempts.getFirst();
 
         Map<String, Object> map = new LinkedHashMap<>();
 
@@ -411,5 +410,22 @@ public class StudentPseudoCodeChallengeService {
         map.put("companyName",challenge.getCompanyName() == null ? "" : challenge.getCompanyName());
 
         return map;
+    }
+
+    private boolean supportedLanguage(String language) {
+        return Set.of(
+                "JAVA",
+                "PYTHON",
+                "C",
+                "CPP",
+                "CSHARP",
+                "FSHARP",
+                "PHP",
+                "RUBY",
+                "HASKELL",
+                "GO",
+                "RUST",
+                "TYPESCRIPT"
+        ).contains(language);
     }
 }

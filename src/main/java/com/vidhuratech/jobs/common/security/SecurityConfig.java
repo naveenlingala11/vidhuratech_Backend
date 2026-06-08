@@ -14,6 +14,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
 
 @Configuration
 @EnableMethodSecurity
@@ -30,6 +32,26 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
+                .headers(headers -> headers
+                        .contentTypeOptions(Customizer.withDefaults())
+                        .frameOptions(frame -> frame.deny())
+                        .referrerPolicy(referrer -> referrer
+                                .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)
+                        )
+                        .httpStrictTransportSecurity(hsts -> hsts
+                                .includeSubDomains(true)
+                                .preload(true)
+                                .maxAgeInSeconds(31536000)
+                        )
+                        .addHeaderWriter(new StaticHeadersWriter(
+                                "Permissions-Policy",
+                                "camera=(), microphone=(), geolocation=(), payment=(), usb=(), fullscreen=(self)"
+                        ))
+                        .addHeaderWriter(new StaticHeadersWriter(
+                                "Content-Security-Policy",
+                                "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
+                        ))
                 )
                 .authorizeHttpRequests(auth -> auth
 
@@ -50,30 +72,46 @@ public class SecurityConfig {
                                 "/api/auth/phone/send-otp",
                                 "/api/auth/phone/verify-otp",
                                 "/api/public/**",
-                                "/uploads/**",
                                 "/api/public/practice/**",
                                 "/api/zoho/**",
-                                "/public/**",
-                                "/v3/api-docs/**",
-                                "/swagger-ui/**",
-                                "/swagger-ui.html"
+                                "/public/**"
                         ).permitAll()
+
                         .requestMatchers(
                                 "/actuator/health",
                                 "/actuator/health/**",
                                 "/course-thumbnails/**"
                         ).permitAll()
+
                         .requestMatchers("/", "/health").permitAll()
+
                         .requestMatchers(HttpMethod.GET, "/api/questions").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/auth/me").authenticated()
 
                         .requestMatchers(HttpMethod.GET, "/api/trainer/public-curriculum").permitAll()
-                        .requestMatchers("/api/checkout/**").permitAll()
-                        .requestMatchers("/api/access/**").permitAll()
-                        .requestMatchers("/api/leads/save", "/api/leads/mock-interview-interest" ).permitAll()                        .requestMatchers("/api/lms/batches/course/*/active").permitAll()
-                        .requestMatchers("/course-thumbnails/**", "/api/lms/batches/course/*/upcoming").permitAll()
+
+                        .requestMatchers(
+                                "/api/checkout/initiate",
+                                "/api/checkout/confirm",
+                                "/api/checkout/status",
+                                "/api/checkout/webhook",
+                                "/api/checkout/verify-payment",
+                                "/api/checkout/create-order"
+                        ).permitAll()
+
+                        .requestMatchers(HttpMethod.GET, "/api/access/**").permitAll()
+
+                        .requestMatchers(
+                                "/api/leads/save",
+                                "/api/leads/mock-interview-interest"
+                        ).permitAll()
+
+                        .requestMatchers("/api/lms/batches/course/*/active").permitAll()
+                        .requestMatchers("/api/lms/batches/course/*/upcoming").permitAll()
+
                         .requestMatchers("/api/notifications/**").authenticated()
+
                         .requestMatchers("/api/leads/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
                         .requestMatchers("/api/super-admin/**").hasAnyRole("SUPER_ADMIN", "ADMIN")
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
@@ -84,6 +122,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/student/**").hasAnyRole("STUDENT", "ADMIN", "SUPER_ADMIN")
                         .requestMatchers("/api/users/**").hasAnyRole("SUPER_ADMIN", "ADMIN", "MANAGER", "HR")
 
+                        .requestMatchers("/api/lms/admin/**").hasAnyRole("ADMIN", "SUPER_ADMIN", "HR")
+
                         .requestMatchers("/api/lms/**").hasAnyRole(
                                 "SUPER_ADMIN",
                                 "ADMIN",
@@ -91,8 +131,17 @@ public class SecurityConfig {
                                 "MENTOR",
                                 "STUDENT"
                         )
-                        .requestMatchers("/api/lms/admin/**").hasAnyRole("ADMIN","SUPER_ADMIN","HR")
+
                         .requestMatchers(HttpMethod.GET, "/certificates/*/download").permitAll()
+
+                        .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).hasAnyRole("ADMIN", "SUPER_ADMIN")
+
+                        .requestMatchers("/uploads/**").denyAll()
+
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(

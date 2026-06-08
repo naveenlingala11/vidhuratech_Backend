@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vidhuratech.jobs.publicpractice.entity.PublicContestAnnouncement;
 import com.vidhuratech.jobs.publicpractice.repository.PublicContestAnnouncementRepository;
 import com.vidhuratech.jobs.student.service.CodeExecutionService;
+import com.vidhuratech.jobs.student.service.CodeSecurityValidator;
 import com.vidhuratech.jobs.trainer.entity.*;
 import com.vidhuratech.jobs.trainer.repository.AssessmentRepository;
 import com.vidhuratech.jobs.trainer.repository.PseudoCodeChallengeRepository;
@@ -50,6 +51,7 @@ public class PublicPracticeService {
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final int PUBLIC_PRACTICE_ATTEMPT_LIMIT = 100;
+    private final CodeSecurityValidator codeSecurityValidator;
 
     private final PublicPracticeAccessGrantRepository grantRepository;
     private final PublicAssessmentAttemptRepository publicAssessmentAttemptRepository;
@@ -380,9 +382,7 @@ public class PublicPracticeService {
             throw new RuntimeException("Unsupported language");
         }
 
-        if (sourceCode.trim().isEmpty()) {
-            throw new RuntimeException("Source code is required");
-        }
+        codeSecurityValidator.validate(language, sourceCode);
 
         int score = 0;
         List<Map<String, Object>> results = new ArrayList<>();
@@ -433,10 +433,11 @@ public class PublicPracticeService {
         String difficultyLevel = normalizedDifficulty(challenge);
         Lead lead = leadRepository.findById(grant.getLeadId()).orElse(null);
 
-        Long matchedUserId = null;
-        if (lead != null && lead.getEmail() != null && !lead.getEmail().isBlank()) {
-            matchedUserId = userRepository.findByEmail(lead.getEmail())
-                    .map(user -> user.getId())
+        Long matchedUserId = securityUtils.getCurrentUserId();
+
+        if (matchedUserId == null && lead != null && lead.getEmail() != null && !lead.getEmail().isBlank()) {
+            matchedUserId = userRepository.findByEmail(lead.getEmail().trim().toLowerCase())
+                    .map(User::getId)
                     .orElse(null);
         }
 
@@ -1029,6 +1030,12 @@ public class PublicPracticeService {
             row.put("name", maskName(identityAttempt == null ? "" : identityAttempt.getParticipantName()));
             row.put("email", maskEmail(identityAttempt == null ? "" : identityAttempt.getParticipantEmail()));
             row.put("phone", maskPhone(identityAttempt == null ? "" : identityAttempt.getParticipantPhone()));
+            String profileImageUrl = profileImageUrlForAttempt(identityAttempt);
+
+            row.put("profileImageUrl", profileImageUrl);
+            row.put("userProfileImageUrl", profileImageUrl);
+            row.put("authorProfileImageUrl", profileImageUrl);
+            row.put("picture", profileImageUrl);
             row.put("attemptedChallenges", attemptedChallenges);
             row.put("solvedChallenges", solvedChallenges);
             row.put("solvedSummary", solvedChallenges + "/" + attemptedChallenges);
@@ -1173,6 +1180,47 @@ public class PublicPracticeService {
         return response;
     }
 
+    private String profileImageUrlForAttempt(PublicChallengeAttempt attempt) {
+        if (attempt == null) {
+            return "";
+        }
+
+        if (attempt.getUserId() != null) {
+            String url = userRepository.findById(attempt.getUserId())
+                    .map(User::getProfileImageUrl)
+                    .map(this::safeProfileImageUrl)
+                    .orElse("");
+
+            if (!url.isBlank()) {
+                return url;
+            }
+        }
+
+        String email = attempt.getParticipantEmail();
+
+        if (email == null || email.isBlank()) {
+            return "";
+        }
+
+        return userRepository.findByEmail(email.trim().toLowerCase())
+                .map(User::getProfileImageUrl)
+                .map(this::safeProfileImageUrl)
+                .orElse("");
+    }
+    private String safeProfileImageUrl(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+
+        String url = value.trim();
+
+        if (url.length() > 1000) {
+            return "";
+        }
+
+        return url.startsWith("https://") ? url : "";
+    }
+
     private List<Map<String, Object>> buildLeaderboard(
             List<PublicChallengeAttempt> attempts,
             int limit
@@ -1229,6 +1277,12 @@ public class PublicPracticeService {
             row.put("language", attempt.getLanguage());
             row.put("totalExecutionTimeMs", attempt.getTotalExecutionTimeMs() == null ? 0 : attempt.getTotalExecutionTimeMs());
             row.put("submittedAt", attempt.getSubmittedAt());
+            String profileImageUrl = profileImageUrlForAttempt(attempt);
+
+            row.put("profileImageUrl", profileImageUrl);
+            row.put("userProfileImageUrl", profileImageUrl);
+            row.put("authorProfileImageUrl", profileImageUrl);
+            row.put("picture", profileImageUrl);
 
             rows.add(row);
         }

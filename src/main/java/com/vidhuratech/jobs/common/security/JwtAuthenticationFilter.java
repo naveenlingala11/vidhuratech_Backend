@@ -93,6 +93,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private boolean isPublicPath(String path) {
+        if (path == null || path.isBlank()) {
+            return false;
+        }
+
         return path.equals("/api/auth/register")
                 || path.equals("/api/auth/login")
                 || path.equals("/api/auth/set-password")
@@ -107,10 +111,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 || path.equals("/api/auth/phone/send-otp")
                 || path.equals("/api/auth/phone/verify-otp")
                 || path.startsWith("/api/public/")
-                || path.startsWith("/uploads/")
-                || path.startsWith("/public/")
-                || path.startsWith("/v3/api-docs/")
-                || path.startsWith("/swagger-ui/")
-                || path.equals("/swagger-ui.html");
+                || path.startsWith("/public/");
     }
 }
