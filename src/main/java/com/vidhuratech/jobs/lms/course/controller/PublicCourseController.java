@@ -6,6 +6,7 @@ import com.vidhuratech.jobs.lms.course.dto.CourseSearchFilterDTO;
 import com.vidhuratech.jobs.lms.course.entity.CourseStatus;
 import com.vidhuratech.jobs.lms.course.repository.CourseRepository;
 import com.vidhuratech.jobs.lms.course.service.CourseService;
+import com.vidhuratech.jobs.trainer.service.TrainerDashboardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.web.bind.annotation.*;
@@ -19,22 +20,22 @@ public class PublicCourseController {
 
     private final CourseService service;
     private final CourseRepository courseRepository;
+    private final TrainerDashboardService trainerDashboardService;
+
+    @GetMapping("/{courseId}/curriculum")
+    public ApiResponse<?> getCourseCurriculum(@PathVariable Long courseId) {
+        return ApiResponse.builder()
+                .success(true)
+                .data(trainerDashboardService.getOrCreateCourseCurriculum(courseId))
+                .build();
+    }
 
     @GetMapping
     public ApiResponse<List<CourseResponseDTO>> getActiveCourses(
             @RequestParam(required = false) Boolean preview
     ) {
-
-        CourseSearchFilterDTO filter = new CourseSearchFilterDTO();
-        filter.setActive(true);
-
-        if (preview == null || !preview) {
-            filter.setStatus(CourseStatus.PUBLISHED);
-        }
-
-        List<CourseResponseDTO> courses = service
-                .search(filter, PageRequest.of(0, 100))
-                .getContent();
+        boolean isPreview = preview != null && preview;
+        List<CourseResponseDTO> courses = service.getActiveCourses(isPreview);
 
         return ApiResponse.<List<CourseResponseDTO>>builder()
                 .success(true)

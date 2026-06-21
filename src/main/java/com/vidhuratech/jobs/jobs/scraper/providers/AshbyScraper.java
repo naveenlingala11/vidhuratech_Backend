@@ -38,7 +38,7 @@ public class AshbyScraper implements ApiScraper {
             for (JsonNode j : arr) {
                 try {
                     String title    = j.path("title").asText("");
-                    String location = j.path("location").asText("India");
+                    String location = j.path("location").asText("");
                     String link     = j.path("jobUrl").asText("");
 
                     if (title.isBlank() || link.isBlank()) continue;
@@ -49,6 +49,7 @@ public class AshbyScraper implements ApiScraper {
             System.out.println("✅ Ashby [" + config.getCompany() + "] → " + jobs.size());
         } catch (Exception e) {
             System.out.println("❌ Ashby [" + config.getCompany() + "]: " + e.getMessage());
+            return null;
         }
         return jobs;
     }

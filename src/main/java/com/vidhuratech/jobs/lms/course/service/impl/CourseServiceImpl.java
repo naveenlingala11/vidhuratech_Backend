@@ -18,6 +18,9 @@ import com.vidhuratech.jobs.user.entity.User;
 import com.vidhuratech.jobs.user.enums.UserRole;
 import com.vidhuratech.jobs.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +40,7 @@ public class CourseServiceImpl implements CourseService {
     private final UserRepository userRepository;
 
     @Override
+    @CacheEvict(value = {"active_courses", "featured_courses"}, allEntries = true)
     public CourseResponseDTO create(CourseRequestDTO dto) {
 
         if (dto.getCode() == null || dto.getCode().isBlank()) {
@@ -66,6 +70,7 @@ public class CourseServiceImpl implements CourseService {
     }
 
     @Override
+    @CacheEvict(value = {"active_courses", "featured_courses"}, allEntries = true)
     public BulkCourseResponse bulkCreate(List<CourseRequestDTO> list) {
 
         List<String> duplicates = new ArrayList<>();
@@ -103,6 +108,10 @@ public class CourseServiceImpl implements CourseService {
     }
 
     @Override
+    @Caching(evict = {
+        @CacheEvict(value = "courses", key = "#id"),
+        @CacheEvict(value = {"active_courses", "featured_courses"}, allEntries = true)
+    })
     public CourseResponseDTO update(Long id, CourseRequestDTO dto) {
         Course course = getEntity(id);
 
@@ -112,6 +121,7 @@ public class CourseServiceImpl implements CourseService {
     }
 
     @Override
+    @Cacheable(value = "courses", key = "#id")
     public CourseResponseDTO getById(Long id) {
         return mapper.toResponse(getEntity(id));
     }
@@ -126,6 +136,10 @@ public class CourseServiceImpl implements CourseService {
 
     @Override
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(value = "courses", key = "#id"),
+        @CacheEvict(value = {"active_courses", "featured_courses"}, allEntries = true)
+    })
     public CourseResponseDTO publish(Long id) {
         Course course = getEntity(id);
 
@@ -152,6 +166,10 @@ public class CourseServiceImpl implements CourseService {
 
     @Override
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(value = "courses", key = "#id"),
+        @CacheEvict(value = {"active_courses", "featured_courses"}, allEntries = true)
+    })
     public CourseResponseDTO unpublish(Long id) {
         Course course = getEntity(id);
 
@@ -169,6 +187,10 @@ public class CourseServiceImpl implements CourseService {
     }
 
     @Override
+    @Caching(evict = {
+        @CacheEvict(value = "courses", key = "#id"),
+        @CacheEvict(value = {"active_courses", "featured_courses"}, allEntries = true)
+    })
     public void archive(Long id) {
         Course course = getEntity(id);
 
@@ -177,6 +199,10 @@ public class CourseServiceImpl implements CourseService {
     }
 
     @Override
+    @Caching(evict = {
+        @CacheEvict(value = "courses", key = "#id"),
+        @CacheEvict(value = {"active_courses", "featured_courses"}, allEntries = true)
+    })
     public void softDelete(Long id) {
         Course course = getEntity(id);
 
@@ -185,6 +211,7 @@ public class CourseServiceImpl implements CourseService {
     }
 
     @Override
+    @Cacheable(value = "featured_courses")
     public List<CourseResponseDTO> getFeaturedCourses() {
         return repository
                 .findByActiveTrueAndStatusAndFeaturedOnHomeTrueOrderByFeaturedRankAscIdDesc(
@@ -198,10 +225,25 @@ public class CourseServiceImpl implements CourseService {
 
     @Override
     @Transactional
+    @Caching(evict = {
+        @CacheEvict(value = "courses", key = "#id"),
+        @CacheEvict(value = {"active_courses", "featured_courses"}, allEntries = true)
+    })
     public CourseResponseDTO updateThumbnail(Long id, String thumbnailUrl) {
         Course course = getEntity(id);
         course.setThumbnailUrl(thumbnailUrl);
         return mapper.toResponse(repository.save(course));
+    }
+
+    @Override
+    @Cacheable(value = "active_courses", key = "#preview")
+    public List<CourseResponseDTO> getActiveCourses(boolean preview) {
+        CourseSearchFilterDTO filter = new CourseSearchFilterDTO();
+        filter.setActive(true);
+        if (!preview) {
+            filter.setStatus(CourseStatus.PUBLISHED);
+        }
+        return search(filter, PageRequest.of(0, 100)).getContent();
     }
 
     private Course getEntity(Long id) {

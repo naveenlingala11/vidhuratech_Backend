@@ -262,19 +262,46 @@ public class CodeSecurityValidator {
         String firstLine = trimmed.lines()
                 .findFirst()
                 .orElse("")
-                .trim()
-                .toLowerCase(Locale.ROOT);
+                .trim();
+        String firstLineLower = firstLine.toLowerCase(Locale.ROOT);
 
-        return firstLine.matches("^(find|cat|ls|pwd|whoami|id|uname|ps|env|printenv|curl|wget|nc|netcat|bash|sh|zsh|python|python3|perl|ruby)\\b.*")
-                || firstLine.contains("2>/dev/null")
-                || firstLine.contains("/etc/passwd")
-                || firstLine.contains("/home")
-                || firstLine.contains("/proc")
-                || firstLine.contains("/root")
-                || firstLine.contains("&&")
-                || firstLine.contains("||")
-                || firstLine.contains(";")
-                || firstLine.contains("|");
+        // If it's a comment or common programming starting construct, it's not a shell command
+        List<String> codeStarters = List.of(
+            "import ", "from ", "package ", "using ", "public ", "class ", "private ", 
+            "protected ", "void ", "int ", "float ", "double ", "char ", "bool ", "boolean ",
+            "let ", "const ", "var ", "function ", "def ", "namespace ", 
+            "#include", "include ", "struct ", "enum ", "//", "/*", "*", "<?php", "<?",
+            "const", "let", "var", "def", "import", "from"
+        );
+
+        boolean startsWithCodeKeyword = codeStarters.stream().anyMatch(starter -> {
+            if (starter.startsWith("#") || starter.startsWith("//") || starter.startsWith("/*") || starter.startsWith("*")) {
+                return firstLine.startsWith(starter);
+            }
+            return firstLineLower.startsWith(starter);
+        });
+
+        if (startsWithCodeKeyword) {
+            return false;
+        }
+
+        // Shell command pattern matching actual commands
+        boolean isShell = firstLineLower.matches("^(find|cat|ls|pwd|whoami|id|uname|ps|env|printenv|curl|wget|nc|netcat|bash|sh|zsh|python|python3|perl|ruby|chmod|chown|rm|mv|cp|mkdir|rmdir|touch|grep|egrep|fgrep|sed|awk|tar|zip|unzip|git|docker|kubectl|systemctl|service|apt|yum|dnf|pacman|pip|npm|yarn|npx)\\b.*")
+                || firstLineLower.startsWith("./")
+                || firstLineLower.startsWith("/")
+                || firstLineLower.startsWith("../");
+
+        if (isShell) {
+            return true;
+        }
+
+        // Suspicious file paths or redirection operators on the first line
+        List<String> suspicious = List.of("/etc/passwd", "/proc/", "/root/", "2>/dev/null", "> /dev/null");
+        if (suspicious.stream().anyMatch(firstLineLower::contains)) {
+            return true;
+        }
+
+        return false;
     }
 
     private static Pattern p(String regex) {

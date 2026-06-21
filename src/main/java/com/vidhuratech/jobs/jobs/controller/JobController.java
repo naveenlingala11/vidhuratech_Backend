@@ -4,6 +4,7 @@ import com.vidhuratech.jobs.jobs.dto.FilterOption;
 import com.vidhuratech.jobs.jobs.dto.JobResponse;
 import com.vidhuratech.jobs.jobs.dto.PageResponse;
 import com.vidhuratech.jobs.jobs.entity.Job;
+import com.vidhuratech.jobs.jobs.service.JobSeederService;
 import com.vidhuratech.jobs.jobs.service.JobService;
 import com.vidhuratech.jobs.jobs.service.ScraperService;
 import org.springframework.data.domain.Pageable;
@@ -22,10 +23,14 @@ public class JobController {
 
     private final JobService service;
     private final ScraperService scraperService;
+    private final JobSeederService seederService;
 
-    public JobController(JobService service, ScraperService scraperService) {
+    public JobController(JobService service,
+                         ScraperService scraperService,
+                         JobSeederService seederService) {
         this.service = service;
         this.scraperService = scraperService;
+        this.seederService = seederService;
     }
 
     // ✅ FIX: Missing @GetMapping
@@ -81,12 +86,13 @@ public class JobController {
             @RequestParam(required = false) String experience,
             @RequestParam(required = false) Boolean remote,
             @RequestParam(required = false) String dateFilter,
+            @RequestParam(required = false) String jobType,
             @RequestParam(defaultValue = "latest") String sort,
             @PageableDefault(size = 15) Pageable pageable) {
 
         return service.searchAdvanced(
                 keyword, locations, companies, skills,
-                experience, remote, dateFilter, sort, pageable);
+                experience, remote, dateFilter, jobType, sort, pageable);
     }
 
     @GetMapping("/filters")
@@ -108,5 +114,13 @@ public class JobController {
     public String triggerScrape() {
         new Thread(scraperService::scrapeAll).start();
         return "🚀 Scraping started! Check server logs.";
+    }
+
+    @GetMapping("/seed")
+    public ResponseEntity<Map<String, Object>> seedJobs(
+            @RequestParam(defaultValue = "1000000") int count,
+            @RequestParam(defaultValue = "true") boolean clean) {
+        Map<String, Object> result = seederService.seedJobs(count, clean);
+        return ResponseEntity.ok(result);
     }
 }

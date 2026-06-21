@@ -32,7 +32,7 @@ public class LeverScraper implements ApiScraper {
             for (JsonNode j : arr) {
                 try {
                     String title    = j.path("text").asText("");
-                    String location = j.path("categories").path("location").asText("India");
+                    String location = j.path("categories").path("location").asText("");
                     String link     = j.path("hostedUrl").asText("");
 
                     if (title.isBlank() || link.isBlank()) continue;
@@ -44,6 +44,7 @@ public class LeverScraper implements ApiScraper {
             System.out.println("✅ Lever [" + config.getCompany() + "] → " + jobs.size());
         } catch (Exception e) {
             System.out.println("❌ Lever [" + config.getCompany() + "]: " + e.getMessage());
+            return null;
         }
         return jobs;
     }

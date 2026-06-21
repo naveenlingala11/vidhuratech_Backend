@@ -1,0 +1,7 @@
+ALTER TABLE mentor_profiles
+ADD COLUMN identity_verified BOOLEAN DEFAULT FALSE,
+ADD COLUMN company_verified BOOLEAN DEFAULT FALSE,
+ADD COLUMN linkedin_verified BOOLEAN DEFAULT FALSE,
+ADD COLUMN cert_verified BOOLEAN DEFAULT FALSE,
+ADD COLUMN terms_verified BOOLEAN DEFAULT FALSE,
+ADD COLUMN verification_document_url VARCHAR(1000);

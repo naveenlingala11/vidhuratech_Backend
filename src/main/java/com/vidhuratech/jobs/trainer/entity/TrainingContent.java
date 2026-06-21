@@ -40,6 +40,9 @@ public class TrainingContent {
     @Column(name = "file_data", columnDefinition = "bytea")
     private byte[] fileData;
 
+    @Column(name = "file_url", length = 1000)
+    private String fileUrl;
+
     private LocalDateTime createdAt;
 
     @Column(columnDefinition = "TEXT")

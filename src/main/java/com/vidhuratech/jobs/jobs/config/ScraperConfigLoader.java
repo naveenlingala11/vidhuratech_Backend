@@ -6,7 +6,6 @@ import com.vidhuratech.jobs.jobs.scraper.engine.ApiConfig;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Component
 public class ScraperConfigLoader {
@@ -18,135 +17,113 @@ public class ScraperConfigLoader {
     }
 
     public void load() {
-
-        // 🔥 already exists → skip
-        if (repo.count() > 50) {
-            System.out.println("✅ Companies already loaded");
-            return;
-        }
-
-        System.out.println("🚀 Loading companies into DB...");
-
-        List<ApiConfig> configs = verifiedConfigs();
-
-        int added = 0;
-
-        // ✅ FETCH ONCE (IMPORTANT)
-        Set<String> existingCompanies = repo.findAll()
-                .stream()
-                .map(e -> e.getCompany().toLowerCase())
-                .collect(Collectors.toSet());
-
-        for (ApiConfig c : configs) {
-            try {
-
-                // ✅ CHECK USING SET (FAST)
-                if (existingCompanies.contains(c.getCompany().toLowerCase())) continue;
-
+        System.out.println("🚀 Refreshing/Loading scraper configurations into DB...");
+        try {
+            repo.deleteAll();
+            List<ApiConfig> configs = verifiedConfigs();
+            for (ApiConfig c : configs) {
                 ScraperConfigEntity e = new ScraperConfigEntity();
                 e.setCompany(c.getCompany());
                 e.setType(c.getType());
                 e.setUrl(c.getUrl());
-
+                e.setActive(true);
+                e.setFailCount(0);
+                e.setSuccessCount(0);
                 repo.save(e);
-                added++;
-
-            } catch (Exception ex) {
-                System.out.println("❌ Failed: " + c.getCompany());
             }
+            System.out.println("✅ Loaded " + configs.size() + " verified scraper configurations.");
+        } catch (Exception ex) {
+            System.out.println("❌ Failed to load configurations: " + ex.getMessage());
         }
-
-        System.out.println("✅ TOTAL ADDED: " + added);
     }
 
     private List<ApiConfig> verifiedConfigs() {
-
         List<ApiConfig> list = new ArrayList<>();
 
-        // ───────────────── GREENHOUSE (80+) ─────────────────
-        List<String> gh = List.of(
-                "postman","notion","coinbase","robinhood","figma","brex","plaid","stripe",
-                "doordash","lyft","dropbox","asana","zendesk","twilio","cloudflare",
-                "datadog","hashicorp","pagerduty","okta","newrelic","grafanalabs",
-                "1password","airtable","amplitude","intercom","mixpanel","netlify",
-                "vercel","linear","segment",
-                "instacart","discord","shopify","reddit","coursera","quora",
-                "atlassian","canva","unity","zapier","loom","calendly",
-                "drift","gusto","figment","retool","scaleai","openai",
-                "grammarly","udemy","robinhood","brex","rippling","webflow",
-                "superhuman","flexport","figma","clearbit","segment",
-                "sendgrid","fastly","algolia","snyk","circleci",
-                "contentful","gitlab","elastic","docker","digitalocean",
-                "hashicorp","mongodb","snowflake","databricks"
-        );
+        // ───────────────── GREENHOUSE (Verified India offices / Indian Tech) ─────────────────
+        list.add(gh("Razorpay", "razorpaysoftwareprivatelimited"));
+        list.add(gh("Groww", "groww"));
+        list.add(gh("InMobi", "inmobi"));
+        list.add(gh("Delhivery", "delhivery"));
+        list.add(gh("Cars24", "cars24"));
+        list.add(gh("ShareChat", "sharechat"));
+        list.add(gh("Urban Company", "urbancompany"));
+        list.add(gh("Pocket FM", "pocketfm"));
+        list.add(gh("Postman", "postman"));
+        list.add(gh("Atlassian", "atlassian"));
+        list.add(gh("Stripe", "stripe"));
+        list.add(gh("Coinbase", "coinbase"));
+        list.add(gh("Vercel", "vercel"));
+        list.add(gh("Elastic", "elastic"));
+        list.add(gh("MongoDB", "mongodb"));
+        list.add(gh("Snowflake", "snowflake"));
+        list.add(gh("Databricks", "databricks"));
+        list.add(gh("Twilio", "twilio"));
+        list.add(gh("New Relic", "newrelic"));
+        list.add(gh("GitLab", "gitlab"));
+        list.add(gh("Docker", "docker"));
+        list.add(gh("DigitalOcean", "digitalocean"));
+        list.add(gh("PagerDuty", "pagerduty"));
 
-        gh.forEach(s -> list.add(gh(cap(s), s)));
+        // ───────────────── LEVER (Verified) ─────────────────
+        list.add(lv("Meesho", "meesho"));
+        list.add(lv("CRED", "cred"));
+        list.add(lv("Zeta", "zeta"));
+        list.add(lv("Rippling", "rippling"));
+        list.add(lv("Deel", "deel"));
+        list.add(lv("Benchling", "benchling"));
+        list.add(lv("Vanta", "vanta"));
+        list.add(lv("Replit", "replit"));
 
-        // ───────────────── LEVER (60+) ─────────────────
-        List<String> lv = List.of(
-                "canva","rippling","scaleai","faire","benchling","lattice","gem","persona",
-                "retool","dbtlabs","airbyte","census","hightouch","temporal","hex",
-                "montecarlodata","prefect","dagsterlabs","astronomer","observeinc",
-                "zapier","figment","pilot","ramp","bolt","clerk",
-                "supabase","planetscale","railway","render","flyio",
-                "replicate","modal","together","perplexity","groq",
-                "runwayml","elevenlabs","pika","replit","codeium",
-                "vanta","merge","checkr","veriff","sift",
-                "deel","remote","multiplier","rippling"
-        );
+        // ───────────────── WORKDAY (MNC India / Indian giants) ─────────────────
+        // Commented out due to internal play session CSRF protection causing 422 responses
+        // list.add(wd("Deloitte", "https://deloitte.wd1.myworkdayjobs.com/wday/cxs/deloitte/DeloitteCareers/jobs"));
+        // list.add(wd("EY", "https://ey.wd5.myworkdayjobs.com/wday/cxs/ey/EY_External_Careers/jobs"));
+        // list.add(wd("KPMG", "https://kpmg.wd3.myworkdayjobs.com/wday/cxs/kpmg/KPMG_External/jobs"));
+        // list.add(wd("Accenture", "https://accenture.wd3.myworkdayjobs.com/wday/cxs/accenture/AccentureCareers/jobs"));
+        // list.add(wd("Capgemini", "https://capgemini.wd3.myworkdayjobs.com/wday/cxs/capgemini/Capgemini_Careers/jobs"));
+        // list.add(wd("Wipro", "https://wipro.wd3.myworkdayjobs.com/wday/cxs/wipro/WiproExternalCareerSite/jobs"));
+        // list.add(wd("HCL", "https://hcltech.wd3.myworkdayjobs.com/wday/cxs/hcltech/HCLTechCareers/jobs"));
+        // list.add(wd("Infosys", "https://infosys.wd5.myworkdayjobs.com/wday/cxs/infosys/InfosysCareers/jobs"));
+        // list.add(wd("IBM", "https://ibm.wd5.myworkdayjobs.com/wday/cxs/ibm/External/jobs"));
+        // list.add(wd("Oracle", "https://oracle.wd1.myworkdayjobs.com/wday/cxs/oracle/External/jobs"));
+        // list.add(wd("Cisco", "https://cisco.wd1.myworkdayjobs.com/wday/cxs/cisco/jobs/jobs"));
+        // list.add(wd("ServiceNow", "https://servicenow.wd5.myworkdayjobs.com/wday/cxs/servicenow/jobs/jobs"));
+        // list.add(wd("PhonePe", "https://phonepe.wd3.myworkdayjobs.com/wday/cxs/phonepe/PhonePe_Careers/jobs"));
+        // list.add(wd("Swiggy", "https://swiggy.wd3.myworkdayjobs.com/wday/cxs/swiggy/Swiggy_Careers/jobs"));
+        // list.add(wd("Flipkart", "https://flipkart.wd3.myworkdayjobs.com/wday/cxs/flipkart/Flipkart_Careers/jobs"));
 
-        lv.forEach(s -> list.add(lv(cap(s), s)));
-
-        // ───────────────── WORKDAY (REAL INDIA) ─────────────────
-        list.addAll(List.of(
-                wd("Deloitte","https://deloitte.wd1.myworkdayjobs.com/wday/cxs/deloitte/DeloitteCareers/jobs"),
-                wd("EY","https://ey.wd5.myworkdayjobs.com/wday/cxs/ey/EY_External_Careers/jobs"),
-                wd("KPMG","https://kpmg.wd3.myworkdayjobs.com/wday/cxs/kpmg/KPMG_External/jobs"),
-                wd("Accenture","https://accenture.wd3.myworkdayjobs.com/wday/cxs/accenture/AccentureCareers/jobs"),
-                wd("Capgemini","https://capgemini.wd3.myworkdayjobs.com/wday/cxs/capgemini/Capgemini_Careers/jobs"),
-                wd("Wipro","https://wipro.wd3.myworkdayjobs.com/wday/cxs/wipro/WiproExternalCareerSite/jobs"),
-                wd("HCL","https://hcltech.wd3.myworkdayjobs.com/wday/cxs/hcltech/HCLTechCareers/jobs"),
-                wd("Infosys","https://infosys.wd5.myworkdayjobs.com/wday/cxs/infosys/InfosysCareers/jobs"),
-                wd("IBM","https://ibm.wd5.myworkdayjobs.com/wday/cxs/ibm/External/jobs"),
-                wd("Oracle","https://oracle.wd1.myworkdayjobs.com/wday/cxs/oracle/External/jobs"),
-                wd("Cisco","https://cisco.wd1.myworkdayjobs.com/wday/cxs/cisco/jobs/jobs"),
-                wd("ServiceNow","https://servicenow.wd5.myworkdayjobs.com/wday/cxs/servicenow/jobs/jobs")
-        ));
-
-        // ───────────────── SMARTRECRUITERS ─────────────────
-        List<String> sr = List.of(
-                "Amazon","Microsoft","Google","Adobe","SAP",
-                "Siemens","BoschGroup","Philips","Ericsson","Nokia",
-                "ABB","SchneiderElectric","Honeywell","Amdocs"
-        );
-
-        sr.forEach(s -> list.add(sr(s, s)));
+        // ───────────────── SMARTRECRUITERS (Verified) ─────────────────
+        list.add(sr("BoschGroup", "BoschGroup"));
+        list.add(sr("Siemens", "Siemens"));
+        list.add(sr("Philips", "Philips"));
+        list.add(sr("Ericsson", "Ericsson"));
+        list.add(sr("Nokia", "Nokia"));
+        list.add(sr("ABB", "ABB"));
+        list.add(sr("Honeywell", "Honeywell"));
+        list.add(sr("Amdocs", "Amdocs"));
 
         return list;
     }
 
     // ── HELPERS ──
-    private String cap(String s) {
-        return s.substring(0,1).toUpperCase() + s.substring(1);
-    }
-
     private ApiConfig gh(String c, String s) {
-        return cfg(c,"greenhouse",
-                "https://boards-api.greenhouse.io/v1/boards/"+s+"/jobs?content=true");
+        return cfg(c, "greenhouse",
+                "https://boards-api.greenhouse.io/v1/boards/" + s + "/jobs?content=true");
     }
 
     private ApiConfig lv(String c, String s) {
-        return cfg(c,"lever",
-                "https://api.lever.co/v0/postings/"+s+"?mode=json");
+        return cfg(c, "lever",
+                "https://api.lever.co/v0/postings/" + s + "?mode=json");
     }
 
     private ApiConfig wd(String c, String url) {
-        return cfg(c,"workday",url);
+        return cfg(c, "workday", url);
     }
 
     private ApiConfig sr(String c, String id) {
-        return cfg(c,"smartrecruiters",
-                "https://api.smartrecruiters.com/v1/companies/"+id+"/postings");
+        return cfg(c, "smartrecruiters",
+                "https://api.smartrecruiters.com/v1/companies/" + id + "/postings");
     }
 
     private ApiConfig cfg(String c, String t, String u) {

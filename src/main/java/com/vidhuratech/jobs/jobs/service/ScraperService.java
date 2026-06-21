@@ -70,10 +70,24 @@ public class ScraperService {
                     sleepRandom();
                 });
             }
+
+            pool.shutdown();
+            try {
+                if (!pool.awaitTermination(30, java.util.concurrent.TimeUnit.MINUTES)) {
+                    pool.shutdownNow();
+                }
+            } catch (InterruptedException ex) {
+                pool.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+
             long globalEnd = System.currentTimeMillis();
 
             System.out.println("🏁 SCRAPING COMPLETED");
             System.out.println("⏱ TOTAL TIME: " + ((globalEnd - globalStart) / 1000) + " sec");
+
+            // Run sweep validation of all job links to prune dead ones
+            jobService.validateAllJobLinks();
 
         } finally {
             status.setRunning(false); // 🔥 VERY IMPORTANT
@@ -97,29 +111,34 @@ public class ScraperService {
         cfg.setType(entity.getType());
         cfg.setUrl(entity.getUrl());
 
-        List<Job> jobs = List.of();
+        List<Job> jobs = null;
         boolean success = false;
+        boolean scraperError = false;
 
         try {
             // 🔥 ADDED RETRY (3 TIMES)
             jobs = retry(cfg);
 
-            if (jobs == null || jobs.isEmpty()) {
-                System.out.println("⚠️ NO JOBS FOUND: " + company);
-                success = false;
+            if (jobs == null) {
+                System.out.println("❌ SCRAPER FAILED (API/Network Error): " + company);
+                scraperError = true;
             } else {
                 success = true;
+                if (jobs.isEmpty()) {
+                    System.out.println("⚠️ NO JOBS FOUND: " + company);
+                }
             }
 
         } catch (Exception e) {
             System.out.println("❌ ERROR [" + company + "]: " + e.getMessage());
-            success = false;
+            scraperError = true;
         }
 
         // ───── UPDATE SUCCESS / FAIL ─────
         if (success) {
             entity.setSuccessCount(entity.getSuccessCount() + 1);
-        } else {
+            entity.setFailCount(0); // 🔥 RESET fail count on success!
+        } else if (scraperError) {
             entity.setFailCount(entity.getFailCount() + 1);
         }
 
@@ -145,6 +164,16 @@ public class ScraperService {
             }
         }
 
+        if (jobs != null) {
+            java.util.List<String> activeApplyLinks = new java.util.ArrayList<>();
+            for (Job job : jobs) {
+                if (job.getApplyLink() != null) {
+                    activeApplyLinks.add(job.getApplyLink());
+                }
+            }
+            jobService.cleanExpiredJobs(company, activeApplyLinks);
+        }
+
         long end = System.currentTimeMillis();
 
         // 🔥 SAME LOG FORMAT (UNCHANGED)
@@ -163,13 +192,16 @@ public class ScraperService {
 
         for (int i = 1; i <= 3; i++) {
             try {
-                return engine.run(cfg);
+                List<Job> jobs = engine.run(cfg);
+                if (jobs != null) {
+                    return jobs;
+                }
             } catch (Exception e) {
                 System.out.println("🔁 Retry " + i + " → " + cfg.getCompany());
             }
         }
 
-        return List.of();
+        return null;
     }
 
     // ─────────────────────────────────────────

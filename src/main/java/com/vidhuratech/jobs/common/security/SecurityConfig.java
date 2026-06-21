@@ -86,6 +86,7 @@ public class SecurityConfig {
                         .requestMatchers("/", "/health").permitAll()
 
                         .requestMatchers(HttpMethod.GET, "/api/questions").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/jobs", "/jobs/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/auth/me").authenticated()
 
@@ -114,7 +115,7 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/leads/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
                         .requestMatchers("/api/super-admin/**").hasAnyRole("SUPER_ADMIN", "ADMIN")
-                        .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
+                        .requestMatchers("/api/admin/**", "/jobs/admin/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
                         .requestMatchers("/api/hr/**").hasRole("HR")
                         .requestMatchers("/api/manager/**").hasRole("MANAGER")
                         .requestMatchers("/api/trainer/**").hasRole("TRAINER")

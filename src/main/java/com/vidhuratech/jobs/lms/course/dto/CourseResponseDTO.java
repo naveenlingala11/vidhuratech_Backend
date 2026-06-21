@@ -2,14 +2,18 @@ package com.vidhuratech.jobs.lms.course.dto;
 
 import com.vidhuratech.jobs.lms.course.entity.CourseLevel;
 import com.vidhuratech.jobs.lms.course.entity.CourseStatus;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class CourseResponseDTO {
 
     private Long id;

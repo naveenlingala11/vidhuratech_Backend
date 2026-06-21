@@ -46,4 +46,22 @@ public class User {
 
     @Column(length = 1000)
     private String profileImageUrl;
+
+    @Column(name = "reputation_points")
+    private Integer reputationPoints = 0;
+
+    @Column(name = "reputation_level")
+    private String reputationLevel = "BEGINNER";
+
+    @Column(columnDefinition = "TEXT")
+    private String bio;
+
+    @Column(columnDefinition = "TEXT")
+    private String skills;
+
+    @Column(name = "social_links", columnDefinition = "TEXT")
+    private String socialLinks;
+
+    @Column(name = "member_since")
+    private LocalDateTime memberSince;
 }

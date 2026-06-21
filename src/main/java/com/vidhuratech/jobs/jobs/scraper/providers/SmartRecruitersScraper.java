@@ -26,6 +26,7 @@ public class SmartRecruitersScraper implements ApiScraper {
         int offset = 0;
         int limit  = 100;
 
+        boolean failed = false;
         while (true) {
             try {
                 String url = config.getUrl() + "?limit=" + limit + "&offset=" + offset;
@@ -44,9 +45,9 @@ public class SmartRecruitersScraper implements ApiScraper {
                 for (JsonNode j : arr) {
                     try {
                         String title    = j.path("name").asText("");
-                        String location = j.path("location").path("city").asText("India");
+                        String location = j.path("location").path("city").asText("");
                         String id       = j.path("id").asText("");
-                        String link     = "https://careers.smartrecruiters.com/" +
+                        String link     = "https://jobs.smartrecruiters.com/" +
                                 config.getCompany().replaceAll("\\s+", "") + "/" + id;
 
                         if (title.isBlank() || id.isBlank()) continue;
@@ -60,8 +61,13 @@ public class SmartRecruitersScraper implements ApiScraper {
 
             } catch (Exception e) {
                 System.out.println("❌ SmartRecruiters [" + config.getCompany() + "]: " + e.getMessage());
+                failed = true;
                 break;
             }
+        }
+
+        if (failed && jobs.isEmpty()) {
+            return null;
         }
 
         System.out.println("✅ SmartRecruiters [" + config.getCompany() + "] → " + jobs.size());
