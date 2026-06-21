@@ -31,10 +31,17 @@ public class NaukriScraper implements ApiScraper {
                     String title = c.select("a.title").text();
                     String location = c.select(".locWdth").text();
                     String link = c.select("a.title").attr("href");
+                    String company = c.select(".subTitle").text().trim();
+                    if (company.isEmpty()) {
+                        company = c.select(".companyInfo a.subTitle").text().trim();
+                    }
+                    if (company.isEmpty()) {
+                        company = "Naukri Partner";
+                    }
 
                     if (title.isBlank()) continue;
 
-                    jobs.add(build("Naukri", title, location, link));
+                    jobs.add(build(company, title, location, link));
 
                 } catch (Exception ignored) {}
             }

@@ -9,11 +9,14 @@ import com.vidhuratech.jobs.trainer.entity.TrainingContentType;
 import com.vidhuratech.jobs.trainer.service.TrainerDashboardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.net.URI;
 
 import java.util.List;
 import java.util.Map;
@@ -162,6 +165,12 @@ public class TrainerDashboardController {
     public ResponseEntity<?> downloadContentFile(@PathVariable Long id) {
         TrainingContent content = service.getContentFile(id);
 
+        if (content.getFileUrl() != null && !content.getFileUrl().isBlank()) {
+            return ResponseEntity.status(HttpStatus.FOUND)
+                    .location(URI.create(content.getFileUrl()))
+                    .build();
+        }
+
         if (content.getFileData() == null || content.getFileData().length == 0) {
             return ResponseEntity.notFound().build();
         }
@@ -183,6 +192,33 @@ public class TrainerDashboardController {
         return ApiResponse.builder()
                 .success(true)
                 .data(service.getAssignedCourses())
+                .build();
+    }
+
+    @GetMapping("/courses/{courseId}/curriculum")
+    @PreAuthorize("hasRole('TRAINER')")
+    public ApiResponse<?> getCourseCurriculum(@PathVariable Long courseId) {
+        return ApiResponse.builder()
+                .success(true)
+                .data(service.getOrCreateCourseCurriculum(courseId))
+                .build();
+    }
+
+    @PostMapping("/courses/{courseId}/curriculum")
+    @PreAuthorize("hasRole('TRAINER')")
+    public ApiResponse<?> saveCourseCurriculumDraft(
+            @PathVariable Long courseId,
+            @RequestBody Map<String, Object> payload
+    ) throws Exception {
+        Object jsonObject = payload.get("json");
+        String jsonData = jsonObject instanceof String
+                ? String.valueOf(jsonObject)
+                : new ObjectMapper().writeValueAsString(jsonObject);
+
+        return ApiResponse.builder()
+                .success(true)
+                .message("Curriculum draft saved successfully")
+                .data(service.saveCourseCurriculumDraft(courseId, jsonData))
                 .build();
     }
 }

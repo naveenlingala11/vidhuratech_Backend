@@ -17,6 +17,11 @@ public class Curriculum {
 
     private Long batchId;
 
+    private Long courseId;
+
+    @Builder.Default
+    private Boolean published = false;
+
     private String trainerEmail;
 
     @Column(columnDefinition = "TEXT")

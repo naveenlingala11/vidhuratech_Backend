@@ -52,34 +52,36 @@ public class GreenhouseScraper implements ApiScraper {
                 try {
                     String title = j.path("title").asText("");
                     String link = j.path("absolute_url").asText("");
+                    String location = j.path("location").path("name").asText("");
 
                     if (title.isBlank()) continue;
 
-                    jobs.add(build(config.getCompany(), title, link));
+                    jobs.add(build(config.getCompany(), title, location, link));
 
                 } catch (Exception ignored) {}
             }
 
         } catch (Exception e) {
             System.out.println("❌ Greenhouse failed: " + config.getCompany());
+            return null;
         }
 
         return jobs;
     }
 
-    private Job build(String company, String title, String link) {
+    private Job build(String company, String title, String location, String link) {
         Job j = new Job();
         j.setTitle(title);
         j.setRole(title);
         j.setCompanyName(company);
         j.setApplyLink(link);
         j.setSource("Greenhouse");
-        j.setLocation("India");
+        j.setLocation(location);
         j.setJobType("Experienced");
         j.setCategory("IT");
         j.setEmploymentType("Full-time");
         j.setSalary("Not Disclosed");
-        j.setRemote(false);
+        j.setRemote(location.toLowerCase().contains("remote"));
         return j;
     }
 }

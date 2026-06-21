@@ -23,10 +23,11 @@ public class WorkdayScraper implements ApiScraper {
         int offset = 0;
         int limit  = 20;
 
+        boolean failed = false;
         while (true) {
             try {
                 String body = String.format(
-                        "{\"limit\":%d,\"offset\":%d,\"searchText\":\"\",\"locations\":[],\"jobFamilies\":[]}",
+                        "{\"appliedFacets\":{},\"limit\":%d,\"offset\":%d,\"searchText\":\"\"}",
                         limit, offset);
 
                 String json = Jsoup.connect(config.getUrl())
@@ -34,7 +35,8 @@ public class WorkdayScraper implements ApiScraper {
                         .method(Connection.Method.POST)
                         .requestBody(body)
                         .header("Content-Type", "application/json")
-                        .header("User-Agent", "Mozilla/5.0")
+                        .header("Accept", "application/json")
+                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
                         .timeout(20000)
                         .execute().body();
 
@@ -46,7 +48,7 @@ public class WorkdayScraper implements ApiScraper {
                 for (JsonNode j : arr) {
                     try {
                         String title    = j.path("title").asText("");
-                        String location = j.path("locationsText").asText("India");
+                        String location = j.path("locationsText").asText("");
                         String path     = j.path("externalPath").asText("");
                         // derive base from config url: https://TENANT.wd1.myworkdayjobs.com/wday/cxs/...
                         String base = config.getUrl().replaceAll("/wday/cxs/.*", "");
@@ -62,8 +64,13 @@ public class WorkdayScraper implements ApiScraper {
 
             } catch (Exception e) {
                 System.out.println("❌ Workday [" + config.getCompany() + "] offset=" + offset + ": " + e.getMessage());
+                failed = true;
                 break;
             }
+        }
+
+        if (failed && jobs.isEmpty()) {
+            return null;
         }
 
         System.out.println("✅ Workday [" + config.getCompany() + "] → " + jobs.size());

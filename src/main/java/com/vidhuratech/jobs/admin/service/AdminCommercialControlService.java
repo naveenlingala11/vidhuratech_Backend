@@ -11,6 +11,7 @@ import com.vidhuratech.jobs.plans.repository.ProjectAccessControlRepository;
 import com.vidhuratech.jobs.user.entity.User;
 import com.vidhuratech.jobs.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -94,6 +95,7 @@ public class AdminCommercialControlService {
                 .toList();
     }
 
+    @CacheEvict(value = "pricing_plans", allEntries = true)
     public Map<String, Object> updatePricing(String planCode, Map<String, Object> payload) {
         PlanPricingControl plan = pricingRepository.findByPlanCodeIgnoreCase(planCode)
                 .orElseGet(() -> PlanPricingControl.builder()

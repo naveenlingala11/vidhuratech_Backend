@@ -7,6 +7,7 @@ import com.vidhuratech.jobs.lms.batch.entity.Batch;
 import com.vidhuratech.jobs.lms.batch.repository.BatchRepository;
 import com.vidhuratech.jobs.trainer.entity.Curriculum;
 import com.vidhuratech.jobs.trainer.repository.CurriculumRepository;
+import com.vidhuratech.jobs.trainer.service.TrainerDashboardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -23,6 +24,7 @@ public class AdminCourseCurriculumController {
     private final BatchRepository batchRepository;
     private final ObjectMapper objectMapper;
     private final ActivityNotificationService notificationService;
+    private final TrainerDashboardService trainerDashboardService;
 
     @GetMapping("/batches/{batchId}/curriculum")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','HR')")
@@ -109,5 +111,24 @@ public class AdminCourseCurriculumController {
         map.put("trainerEmail", curriculum.getTrainerEmail());
         map.put("jsonData", curriculum.getJsonData());
         return map;
+    }
+
+    @GetMapping("/curriculums/pending")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<?> getPendingCurriculums() {
+        return ApiResponse.builder()
+                .success(true)
+                .data(trainerDashboardService.getPendingCurriculums())
+                .build();
+    }
+
+    @PostMapping("/curriculums/{id}/publish")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<?> publishCurriculum(@PathVariable Long id) {
+        return ApiResponse.builder()
+                .success(true)
+                .message("Curriculum approved and published successfully")
+                .data(trainerDashboardService.publishCurriculum(id))
+                .build();
     }
 }

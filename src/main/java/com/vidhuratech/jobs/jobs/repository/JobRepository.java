@@ -39,10 +39,15 @@ public interface JobRepository extends JpaRepository<Job, Long>, JpaSpecificatio
 
     boolean existsByTitleAndCompanyAndApplyLink(String title, Company company, String applyLink);
 
+    void deleteByCompany(Company company);
+
+    void deleteByCompanyAndApplyLinkNotIn(Company company, java.util.Collection<String> applyLinks);
+
     @Query("""
     SELECT COUNT(j)
     FROM Job j
     WHERE j.postedAt IS NOT NULL
     AND j.postedAt >= :date
     """)
-    long countRecent(@Param("date") LocalDateTime date);}
+    long countRecent(@Param("date") LocalDateTime date);
+}

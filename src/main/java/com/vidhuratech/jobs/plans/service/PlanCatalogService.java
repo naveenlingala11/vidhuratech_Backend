@@ -3,6 +3,7 @@ package com.vidhuratech.jobs.plans.service;
 import com.vidhuratech.jobs.plans.entity.PlanPricingControl;
 import com.vidhuratech.jobs.plans.repository.PlanPricingControlRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -26,6 +27,7 @@ public class PlanCatalogService {
         return applyPricingControl(String.valueOf(plan.get("code")), plan);
     }
 
+    @Cacheable(value = "pricing_plans")
     public List<Map<String, Object>> listPlans() {
         return List.of(getPlan("STARTER"), getPlan("PRO"), getPlan("ELITE"));
     }

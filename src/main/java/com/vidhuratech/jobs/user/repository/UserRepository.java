@@ -14,6 +14,8 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     Optional<User> findByEmail(String email);
 
+    List<User> findByEmailIn(java.util.Collection<String> emails);
+
     boolean existsByEmail(String email);
 
     Page<User> findByDeletedFalse(Pageable pageable);
@@ -50,4 +52,5 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     boolean existsByPhone(String phone);
 
+    List<User> findTop10ByDeletedFalseAndActiveTrueOrderByReputationPointsDesc();
 }

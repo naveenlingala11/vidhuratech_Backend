@@ -45,16 +45,21 @@ public class ApiScraperEngine {
                 default -> List.of();
             };
 
+            if (jobs == null) {
+                return null;
+            }
+
             // ✅ fallback if empty
-            if (jobs == null || jobs.isEmpty()) {
-                return fallback(cfg);
+            if (jobs.isEmpty()) {
+                List<Job> fb = fallback(cfg);
+                return fb != null ? fb : List.of();
             }
 
             return jobs;
 
         } catch (Exception e) {
             System.out.println("❌ Engine error: " + cfg.getCompany());
-            return fallback(cfg);
+            return null;
         }
     }
 

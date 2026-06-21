@@ -17,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import org.jsoup.Jsoup;
+import java.util.concurrent.Executors;
 
 @Service
 public class JobService {
@@ -41,9 +43,21 @@ public class JobService {
 
         try {
             if (companyName == null || companyName.isBlank()) {
-                System.out.println("❌ SKIPPED (NO COMPANY): " + job.getTitle());
                 return;
             }
+
+            // 🔥 LOCATION CHECK FOR INDIA ONLY
+            if (job.getLocation() == null || !isIndiaLocation(job.getLocation(), companyName)) {
+                return;
+            }
+
+            // 🔥 VALIDATE APPLY LINK BEFORE SAVING
+            if (job.getApplyLink() != null && !isUrlActive(job.getApplyLink())) {
+                return;
+            }
+
+            // Normalise location to avoid duplicates in filters (e.g. bangalore vs Bengaluru)
+            job.setLocation(normalizeLocation(job.getLocation()));
 
             Company company = companyRepo.findByNameIgnoreCase(companyName)
                     .orElseGet(() -> {
@@ -62,8 +76,11 @@ public class JobService {
             );
 
             if (exists) {
-                System.out.println("⚠️ DUPLICATE SKIPPED: " + job.getTitle());
                 return;
+            }
+
+            if (job.getPostedAt() == null) {
+                job.setPostedAt(LocalDateTime.now());
             }
 
             Job saved = jobRepo.save(job);
@@ -83,18 +100,286 @@ public class JobService {
                 }
             }
 
-            if (job.getPostedAt() == null) {
-                job.setPostedAt(LocalDateTime.now());
-            }
-
             saved.setSkills(skills);
             jobRepo.save(saved);
 
-            System.out.println("✅ SAVED: " + job.getTitle());
-
         } catch (Exception e) {
-            System.out.println("❌ FAILED: " + job.getTitle());
             e.printStackTrace(); // 🔥 VERY IMPORTANT
+        }
+    }
+
+    public static boolean isIndiaLocation(String location, String companyName) {
+        if (location == null || location.isBlank()) {
+            return false;
+        }
+        String loc = location.toLowerCase().trim();
+
+        // Reject if location explicitly mentions foreign countries/cities
+        List<String> foreignList = List.of(
+            "united states", "usa", "uk", "united kingdom", "london", "singapore",
+            "germany", "europe", "canada", "australia", "poland", "spain", "france",
+            "brazil", "vietnam", "netherlands", "ireland", "tokyo", "dubai", "uae",
+            "japan", "italy", "switzerland", "sweden", "austria", "belgium",
+            "finland", "denmark", "norway", "san francisco", "new york", "seattle"
+        );
+        for (String foreign : foreignList) {
+            if (loc.contains(foreign)) {
+                return false;
+            }
+        }
+        
+        // Check "us" as separate token
+        if (loc.equals("us") || loc.startsWith("us ") || loc.endsWith(" us") || 
+            loc.contains(" us ") || loc.contains(",us") || loc.contains(", us") ||
+            loc.contains("/us") || loc.contains("us/")) {
+            return false;
+        }
+
+        // Accept if it explicitly contains "india"
+        if (loc.contains("india")) {
+            return true;
+        }
+
+        // Accept if it contains any major Indian tech hub cities
+        List<String> indianCities = List.of(
+            "bangalore", "bengaluru", "hyderabad", "pune", "mumbai", "noida", 
+            "gurgaon", "gurugram", "delhi", "new delhi", "chennai", "kolkata", 
+            "ahmedabad", "indore", "kochi", "cochin", "jaipur", "bhubaneswar", 
+            "trivandrum", "thiruvananthapuram", "coimbatore", "chandigarh", "nagpur",
+            "lucknow", "mysore", "mysuru", "visakhapatnam", "vizag", "patna",
+            "guwahati", "bhopal", "ranchi", "raipur", "dehradun", "vadodara",
+            "surat", "madurai", "trichy", "tiruchirappalli", "salem", "vijayawada",
+            "guntur", "warangal", "hubli", "dharwad", "mangalore", "mangaluru",
+            "calicut", "kozhikode", "jamshedpur"
+        );
+        for (String city : indianCities) {
+            if (loc.contains(city)) {
+                return true;
+            }
+        }
+
+        // Accept remote ONLY if it's an Indian company or it explicitly says "India" (checked above)
+        if (loc.contains("remote") || loc.contains("work from home")) {
+            return isIndianCompany(companyName);
+        }
+
+        return false;
+    }
+
+    public static String normalizeLocation(String location) {
+        if (location == null || location.isBlank()) {
+            return "";
+        }
+        String loc = location.toLowerCase().trim();
+
+        if (loc.contains("bangalore") || loc.contains("bengaluru") || loc.contains("bengalore")) {
+            return "Bengaluru";
+        }
+        if (loc.contains("hyderabad")) {
+            return "Hyderabad";
+        }
+        if (loc.contains("pune")) {
+            return "Pune";
+        }
+        if (loc.contains("mumbai")) {
+            return "Mumbai";
+        }
+        if (loc.contains("noida")) {
+            return "Noida";
+        }
+        if (loc.contains("gurgaon") || loc.contains("gurugram")) {
+            return "Gurugram";
+        }
+        if (loc.contains("delhi")) {
+            return "New Delhi";
+        }
+        if (loc.contains("chennai")) {
+            return "Chennai";
+        }
+        if (loc.contains("kolkata")) {
+            return "Kolkata";
+        }
+        if (loc.contains("coimbatore")) {
+            return "Coimbatore";
+        }
+        if (loc.contains("kochi") || loc.contains("cochin")) {
+            return "Kochi";
+        }
+        if (loc.contains("trivandrum") || loc.contains("thiruvananthapuram")) {
+            return "Trivandrum";
+        }
+        if (loc.contains("bhubaneswar")) {
+            return "Bhubaneswar";
+        }
+        if (loc.contains("ahmedabad")) {
+            return "Ahmedabad";
+        }
+        if (loc.contains("indore")) {
+            return "Indore";
+        }
+        if (loc.contains("jaipur")) {
+            return "Jaipur";
+        }
+        if (loc.contains("lucknow")) {
+            return "Lucknow";
+        }
+        if (loc.contains("remote") || loc.contains("work from home")) {
+            return "Remote";
+        }
+        
+        // Capitalise words
+        String[] words = location.split("\\s+");
+        StringBuilder sb = new StringBuilder();
+        for (String w : words) {
+            if (!w.isEmpty()) {
+                sb.append(Character.toUpperCase(w.charAt(0)))
+                  .append(w.substring(1).toLowerCase())
+                  .append(" ");
+            }
+        }
+        return sb.toString().trim();
+    }
+
+    private static boolean isIndianCompany(String companyName) {
+        if (companyName == null) return false;
+        String clean = companyName.toLowerCase().replace(" ", "").replace("-", "");
+        Set<String> indianCompanies = Set.of(
+            "groww", "phonepe", "razorpay", "cred", "meesho", "zeta", "pocketfm", 
+            "wipro", "infosys", "hcl", "hcltech", "capgemini", "accenture", "deloitte", 
+            "ey", "kpmg", "tcs", "paytm", "swiggy", "zomato", "delhivery", "inmobi", 
+            "ola", "olaelectric", "atherenergy", "blinkit", "bigbasket", "nykaa", 
+            "practo", "pharmeasy", "tata1mg", "apollo247", "upgrad", "unacademy", 
+            "physicswallah", "scaler", "geeksforgeeks", "juspay", "postman", "zoho",
+            "flipkart"
+        );
+        return indianCompanies.contains(clean);
+    }
+
+    @Transactional
+    public void cleanNonIndiaJobs() {
+        System.out.println("🧹 STARTING CLEANUP OF NON-INDIA JOBS...");
+        try {
+            List<Job> allJobs = jobRepo.findAll();
+            List<Job> toDelete = new ArrayList<>();
+            for (Job job : allJobs) {
+                if (job.getLocation() == null || !isIndiaLocation(job.getLocation(), job.getCompanyString())) {
+                    toDelete.add(job);
+                }
+            }
+            if (!toDelete.isEmpty()) {
+                int totalToDelete = toDelete.size();
+                int batchSize = 100;
+                for (int i = 0; i < totalToDelete; i += batchSize) {
+                    List<Job> batch = toDelete.subList(i, Math.min(i + batchSize, totalToDelete));
+                    jobRepo.deleteAllInBatch(batch);
+                }
+                System.out.println("🗑️ DELETED " + totalToDelete + " NON-INDIA JOBS.");
+            } else {
+                System.out.println("✅ NO NON-INDIA JOBS TO DELETE.");
+            }
+        } catch (Exception e) {
+            System.err.println("❌ ERROR CLEANING NON-INDIA JOBS: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    @Transactional
+    public void cleanExpiredJobs(String companyName, List<String> activeApplyLinks) {
+        if (companyName == null || companyName.isBlank()) return;
+        try {
+            Company company = companyRepo.findByNameIgnoreCase(companyName).orElse(null);
+            if (company == null) return;
+
+            if (activeApplyLinks == null || activeApplyLinks.isEmpty()) {
+                jobRepo.deleteByCompany(company);
+            } else {
+                jobRepo.deleteByCompanyAndApplyLinkNotIn(company, activeApplyLinks);
+            }
+        } catch (Exception e) {
+            System.err.println("❌ ERROR CLEANING EXPIRED JOBS FOR " + companyName + ": " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    public static boolean isUrlActive(String url) {
+        if (url == null || url.isBlank() || url.equals("#")) {
+            return false;
+        }
+        try {
+            org.jsoup.Connection.Response response = Jsoup.connect(url)
+                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                    .timeout(6000)
+                    .followRedirects(true)
+                    .ignoreHttpErrors(true)
+                    .execute();
+            
+            int statusCode = response.statusCode();
+            if (statusCode == 404) {
+                return false;
+            }
+            
+            String finalUrl = response.url().toString().toLowerCase();
+            if (finalUrl.contains("/404") || finalUrl.contains("/expired") || finalUrl.contains("/notfound") || finalUrl.contains("/not-found")) {
+                return false;
+            }
+
+            String contentType = response.contentType();
+            if (contentType != null && contentType.toLowerCase().contains("text/html")) {
+                String bodyText = response.body().toLowerCase();
+                if (bodyText.contains("no longer available") || 
+                    bodyText.contains("job is no longer active") || 
+                    bodyText.contains("vacancy has been filled") || 
+                    bodyText.contains("no longer accepting applications") ||
+                    bodyText.contains("job posting has expired") ||
+                    bodyText.contains("position is no longer open") ||
+                    bodyText.contains("this job has expired") ||
+                    bodyText.contains("opportunity is no longer available")) {
+                    return false;
+                }
+            }
+            return true;
+        } catch (org.jsoup.HttpStatusException e) {
+            if (e.getStatusCode() == 404) {
+                return false;
+            }
+            return true;
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
+    public void validateAllJobLinks() {
+        System.out.println("🔍 STARTING DYNAMIC VALIDATION OF ALL JOB LINKS...");
+        try {
+            List<Job> allJobs = jobRepo.findAll();
+            int total = allJobs.size();
+            System.out.println("📋 Total jobs to validate: " + total);
+            
+            try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                for (Job job : allJobs) {
+                    executor.submit(() -> {
+                        String url = job.getApplyLink();
+                        if (url != null && !url.contains("localhost") && !url.isBlank()) {
+                            if (!isUrlActive(url)) {
+                                deleteJobInTransaction(job.getId(), job.getTitle());
+                            }
+                        }
+                    });
+                }
+            }
+            System.out.println("✅ JOB LINKS VALIDATION COMPLETED.");
+        } catch (Exception e) {
+            System.err.println("❌ ERROR VALIDATING JOB LINKS: " + e.getMessage());
+        }
+    }
+
+    @Transactional
+    public void deleteJobInTransaction(Long id, String title) {
+        try {
+            jobRepo.deleteById(id);
+            System.out.println("🗑️ PRUNED EXPIRED/404 JOB: " + title + " (ID: " + id + ")");
+        } catch (Exception e) {
+            // ignore
         }
     }
 
@@ -182,11 +467,12 @@ public class JobService {
             String experience,
             Boolean remote,
             String dateFilter,
+            String jobType,
             String sort,
             Pageable pageable) {
 
         Specification<Job> spec = JobSpecification.filter(
-                keyword, locations, companies, skills, experience, remote, dateFilter);
+                keyword, locations, companies, skills, experience, remote, dateFilter, jobType);
 
         Sort sorting = switch (sort == null ? "latest" : sort) {
             case "oldest" -> Sort.by(Sort.Direction.ASC, "postedAt");

@@ -13,6 +13,7 @@ public interface ScraperConfigRepository extends JpaRepository<ScraperConfigEnti
     List<ScraperConfigEntity> findByActiveTrue();
     Page<ScraperConfigEntity> findByCompanyContainingIgnoreCase(String company, Pageable pageable);
     Optional<ScraperConfigEntity> findByCompany(String company);
+    Optional<ScraperConfigEntity> findByUrl(String url);
     Page<ScraperConfigEntity> findByActive(Boolean active, Pageable pageable);
 
     Page<ScraperConfigEntity> findByCompanyContainingIgnoreCaseAndActive(

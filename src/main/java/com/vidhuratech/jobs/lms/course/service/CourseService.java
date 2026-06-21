@@ -29,4 +29,6 @@ public interface CourseService {
     CourseResponseDTO publish(Long id);
 
     CourseResponseDTO unpublish(Long id);
+
+    List<CourseResponseDTO> getActiveCourses(boolean preview);
 }

@@ -17,6 +17,13 @@ public interface PseudoCodeChallengeRepository extends JpaRepository<PseudoCodeC
 
     List<PseudoCodeChallenge> findByActiveTrueOrderByCreatedAtDesc();
 
+    @Query("""
+        SELECT DISTINCT c
+        FROM PseudoCodeChallenge c
+        LEFT JOIN FETCH c.testCases
+        WHERE c.active = true AND c.publicVisible = true
+        ORDER BY c.publishedAt DESC NULLS LAST, c.id DESC
+    """)
     List<PseudoCodeChallenge> findByActiveTrueAndPublicVisibleTrueOrderByPublishedAtDesc();
 
     List<PseudoCodeChallenge> findAllByOrderByIdDesc();

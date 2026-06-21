@@ -917,16 +917,21 @@ public class PublicPracticeService {
             List<PublicChallengeAttempt> attempts,
             int limit
     ) {
-        Map<Long, PseudoCodeChallenge> challenges = new HashMap<>();
-
+        Set<Long> challengeIds = new HashSet<>();
         for (PublicChallengeAttempt attempt : attempts) {
-            Long challengeId = attempt.getChallengeId();
-
-            if (challengeId != null && !challenges.containsKey(challengeId)) {
-                challengeRepository.findById(challengeId)
-                        .ifPresent(challenge -> challenges.put(challenge.getId(), challenge));
+            if (attempt.getChallengeId() != null) {
+                challengeIds.add(attempt.getChallengeId());
             }
         }
+        Map<Long, PseudoCodeChallenge> challenges = new HashMap<>();
+        if (!challengeIds.isEmpty()) {
+            challengeRepository.findAllById(challengeIds)
+                    .forEach(c -> challenges.put(c.getId(), c));
+        }
+
+        Map<Long, String> profileImageByUserId = new HashMap<>();
+        Map<String, String> profileImageByEmail = new HashMap<>();
+        preloadProfileImages(attempts, profileImageByUserId, profileImageByEmail);
 
         Map<String, Map<Long, PublicChallengeAttempt>> bestByParticipantChallenge = new LinkedHashMap<>();
 
@@ -1030,7 +1035,7 @@ public class PublicPracticeService {
             row.put("name", maskName(identityAttempt == null ? "" : identityAttempt.getParticipantName()));
             row.put("email", maskEmail(identityAttempt == null ? "" : identityAttempt.getParticipantEmail()));
             row.put("phone", maskPhone(identityAttempt == null ? "" : identityAttempt.getParticipantPhone()));
-            String profileImageUrl = profileImageUrlForAttempt(identityAttempt);
+            String profileImageUrl = profileImageUrlForAttempt(identityAttempt, profileImageByUserId, profileImageByEmail);
 
             row.put("profileImageUrl", profileImageUrl);
             row.put("userProfileImageUrl", profileImageUrl);
@@ -1180,18 +1185,18 @@ public class PublicPracticeService {
         return response;
     }
 
-    private String profileImageUrlForAttempt(PublicChallengeAttempt attempt) {
+    private String profileImageUrlForAttempt(
+            PublicChallengeAttempt attempt,
+            Map<Long, String> profileImageByUserId,
+            Map<String, String> profileImageByEmail
+    ) {
         if (attempt == null) {
             return "";
         }
 
         if (attempt.getUserId() != null) {
-            String url = userRepository.findById(attempt.getUserId())
-                    .map(User::getProfileImageUrl)
-                    .map(this::safeProfileImageUrl)
-                    .orElse("");
-
-            if (!url.isBlank()) {
+            String url = profileImageByUserId.get(attempt.getUserId());
+            if (url != null && !url.isBlank()) {
                 return url;
             }
         }
@@ -1202,10 +1207,42 @@ public class PublicPracticeService {
             return "";
         }
 
-        return userRepository.findByEmail(email.trim().toLowerCase())
-                .map(User::getProfileImageUrl)
-                .map(this::safeProfileImageUrl)
-                .orElse("");
+        String url = profileImageByEmail.get(email.trim().toLowerCase());
+        return url == null ? "" : url;
+    }
+
+    private void preloadProfileImages(
+            List<PublicChallengeAttempt> attempts,
+            Map<Long, String> profileImageByUserId,
+            Map<String, String> profileImageByEmail
+    ) {
+        Set<Long> userIds = new HashSet<>();
+        Set<String> emails = new HashSet<>();
+
+        for (PublicChallengeAttempt attempt : attempts) {
+            if (attempt.getUserId() != null) {
+                userIds.add(attempt.getUserId());
+            }
+            if (attempt.getParticipantEmail() != null && !attempt.getParticipantEmail().isBlank()) {
+                emails.add(attempt.getParticipantEmail().trim().toLowerCase());
+            }
+        }
+
+        if (!userIds.isEmpty()) {
+            userRepository.findAllById(userIds).forEach(user -> {
+                if (user.getProfileImageUrl() != null) {
+                    profileImageByUserId.put(user.getId(), safeProfileImageUrl(user.getProfileImageUrl()));
+                }
+            });
+        }
+
+        if (!emails.isEmpty()) {
+            userRepository.findByEmailIn(emails).forEach(user -> {
+                if (user.getProfileImageUrl() != null && user.getEmail() != null) {
+                    profileImageByEmail.put(user.getEmail().trim().toLowerCase(), safeProfileImageUrl(user.getProfileImageUrl()));
+                }
+            });
+        }
     }
     private String safeProfileImageUrl(String value) {
         if (value == null || value.isBlank()) {
@@ -1258,6 +1295,10 @@ public class PublicPracticeService {
                 .limit(limit)
                 .toList();
 
+        Map<Long, String> profileImageByUserId = new HashMap<>();
+        Map<String, String> profileImageByEmail = new HashMap<>();
+        preloadProfileImages(sorted, profileImageByUserId, profileImageByEmail);
+
         List<Map<String, Object>> rows = new ArrayList<>();
 
         for (int i = 0; i < sorted.size(); i++) {
@@ -1277,7 +1318,7 @@ public class PublicPracticeService {
             row.put("language", attempt.getLanguage());
             row.put("totalExecutionTimeMs", attempt.getTotalExecutionTimeMs() == null ? 0 : attempt.getTotalExecutionTimeMs());
             row.put("submittedAt", attempt.getSubmittedAt());
-            String profileImageUrl = profileImageUrlForAttempt(attempt);
+            String profileImageUrl = profileImageUrlForAttempt(attempt, profileImageByUserId, profileImageByEmail);
 
             row.put("profileImageUrl", profileImageUrl);
             row.put("userProfileImageUrl", profileImageUrl);

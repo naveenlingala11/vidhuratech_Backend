@@ -16,7 +16,8 @@ public class JobSpecification {
             List<String> skills,
             String experience,
             Boolean remote,
-            String dateFilter
+            String dateFilter,
+            String jobType
     ) {
         return (root, query, cb) -> {
 
@@ -99,6 +100,33 @@ public class JobSpecification {
             if (remote != null) {
                 p = cb.and(p, cb.equal(root.get("remote"), remote));
             }
+
+            // jobType flag
+            if (jobType != null && !jobType.isBlank()) {
+                String jtLower = jobType.toLowerCase().trim();
+                if ("internship".equals(jtLower)) {
+                    p = cb.and(p, cb.or(
+                            cb.equal(cb.lower(root.get("jobType")), "internship"),
+                            cb.like(cb.lower(root.get("title")), "%intern%")
+                    ));
+                } else if ("walk-in".equals(jtLower) || "walkin".equals(jtLower)) {
+                    p = cb.and(p, cb.or(
+                            cb.equal(cb.lower(root.get("jobType")), "walk-in"),
+                            cb.like(cb.lower(root.get("title")), "%walk-in%"),
+                            cb.like(cb.lower(root.get("title")), "%walkin%")
+                    ));
+                } else if ("fresher".equals(jtLower)) {
+                    // Exclude Internship and Walk-in from both jobType and title
+                    p = cb.and(p, cb.notEqual(cb.lower(root.get("jobType")), "internship"));
+                    p = cb.and(p, cb.notEqual(cb.lower(root.get("jobType")), "walk-in"));
+                    p = cb.and(p, cb.notLike(cb.lower(root.get("title")), "%intern%"));
+                    p = cb.and(p, cb.notLike(cb.lower(root.get("title")), "%walk-in%"));
+                    p = cb.and(p, cb.notLike(cb.lower(root.get("title")), "%walkin%"));
+                } else {
+                    p = cb.and(p, cb.equal(cb.lower(root.get("jobType")), jtLower));
+                }
+            }
+
 
             // dateFilter
             if (dateFilter != null) {
