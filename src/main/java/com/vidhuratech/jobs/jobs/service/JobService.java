@@ -388,6 +388,17 @@ public class JobService {
     // ─────────────────────────────────────────────────────────
     @Transactional
     public Job addJob(Job job) {
+        if (job.getCompany() == null) {
+            throw new RuntimeException("Company is required.");
+        }
+        boolean exists = jobRepo.existsByTitleAndCompanyAndApplyLink(
+                job.getTitle(),
+                job.getCompany(),
+                job.getApplyLink()
+        );
+        if (exists) {
+            throw new RuntimeException("A job posting with the same title, company, and application link already exists.");
+        }
         job.setPostedAt(LocalDateTime.now());
         return jobRepo.save(job);
     }

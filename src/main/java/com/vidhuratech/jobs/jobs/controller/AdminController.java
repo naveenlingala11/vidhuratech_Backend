@@ -1,6 +1,8 @@
 package com.vidhuratech.jobs.jobs.controller;
 
+import com.vidhuratech.jobs.jobs.entity.Company;
 import com.vidhuratech.jobs.jobs.entity.ScraperConfigEntity;
+import com.vidhuratech.jobs.jobs.repository.CompanyRepository;
 import com.vidhuratech.jobs.jobs.repository.JobRepository;
 import com.vidhuratech.jobs.jobs.repository.ScraperConfigRepository;
 import com.vidhuratech.jobs.jobs.scraper.engine.ScraperStatus;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/admin")
@@ -21,6 +24,9 @@ public class AdminController {
 
     @Autowired
     private ScraperConfigRepository repo;
+
+    @Autowired
+    private CompanyRepository companyRepo;
 
     @Autowired
     private JobRepository jobRepo;
@@ -34,6 +40,21 @@ public class AdminController {
     @Autowired
     private UrlValidatorService urlValidator;
 
+    private String detectScraperType(String url) {
+        if (url == null) return "greenhouse";
+        String lower = url.toLowerCase();
+        if (lower.contains("workday")) {
+            return "workday";
+        } else if (lower.contains("lever.co")) {
+            return "lever";
+        } else if (lower.contains("smartrecruiters")) {
+            return "smartrecruiters";
+        } else if (lower.contains("greenhouse")) {
+            return "greenhouse";
+        }
+        return "greenhouse";
+    }
+
     // ✅ ONLY ONE ENDPOINT (FIXED)
     @GetMapping("/companies")
     public Page<ScraperConfigEntity> getCompanies(
@@ -42,6 +63,29 @@ public class AdminController {
             @RequestParam(defaultValue = "asc") String direction,
             @RequestParam(required = false) Boolean active,
             Pageable pageable) {
+
+        // Synchronize missing companies from companies table to scraper_configs
+        try {
+            java.util.List<Company> allCompanies = companyRepo.findAll();
+            for (Company c : allCompanies) {
+                if (c.getName() != null && !c.getName().isBlank()) {
+                    Optional<ScraperConfigEntity> existing = repo.findByCompany(c.getName());
+                    if (existing.isEmpty()) {
+                        ScraperConfigEntity sc = new ScraperConfigEntity();
+                        sc.setCompany(c.getName());
+                        sc.setUrl(c.getWebsite() != null ? c.getWebsite() : "https://www.google.com/search?q=" + c.getName().replace(" ", "+") + "+careers");
+                        sc.setType(detectScraperType(sc.getUrl()));
+                        sc.setActive(true);
+                        sc.setSuccessCount(0);
+                        sc.setFailCount(0);
+                        repo.save(sc);
+                    }
+                }
+            }
+            repo.flush();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
         // 🔥 HANDLE JOB SORT SEPARATELY
         if (sortBy.equalsIgnoreCase("jobs")) {
@@ -113,6 +157,19 @@ public class AdminController {
 
         if (!urlValidator.isValidUrl(c.getUrl())) {
             throw new RuntimeException("❌ Invalid URL");
+        }
+
+        // Also ensure a corresponding Company entity exists in companies table
+        if (c.getCompany() != null && !c.getCompany().isBlank()) {
+            companyRepo.findByNameIgnoreCase(c.getCompany())
+                .orElseGet(() -> {
+                    Company comp = new Company();
+                    comp.setName(c.getCompany());
+                    comp.setWebsite(c.getUrl());
+                    comp.setLogoUrl("https://www.google.com/s2/favicons?domain=" + c.getCompany().toLowerCase().replace(" ", "") + ".com&sz=128");
+                    return companyRepo.save(comp);
+                });
+            companyRepo.flush();
         }
 
         return repo.save(c);

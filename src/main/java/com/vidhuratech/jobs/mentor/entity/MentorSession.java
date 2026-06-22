@@ -33,7 +33,7 @@ public class MentorSession {
     @Column(name = "session_type")
     private String sessionType = "Mock Interview";
 
-    @Column(name = "meeting_link", length = 1000, nullable = false)
+    @Column(name = "meeting_link", columnDefinition = "TEXT", nullable = false)
     private String meetingLink;
 
     private String status = "SCHEDULED";

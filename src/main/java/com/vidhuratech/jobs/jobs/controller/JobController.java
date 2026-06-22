@@ -123,4 +123,12 @@ public class JobController {
         Map<String, Object> result = seederService.seedJobs(count, clean);
         return ResponseEntity.ok(result);
     }
+
+    @GetMapping("/seed/progress")
+    public ResponseEntity<Map<String, Object>> getSeedProgress() {
+        Map<String, Object> progress = new HashMap<>();
+        progress.put("isSeeding", JobSeederService.isSeeding);
+        progress.put("currentProgress", JobSeederService.currentSeedProgress);
+        return ResponseEntity.ok(progress);
+    }
 }

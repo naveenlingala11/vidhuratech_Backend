@@ -40,7 +40,7 @@ public class TrainingContent {
     @Column(name = "file_data", columnDefinition = "bytea")
     private byte[] fileData;
 
-    @Column(name = "file_url", length = 1000)
+    @Column(name = "file_url", columnDefinition = "TEXT")
     private String fileUrl;
 
     private LocalDateTime createdAt;

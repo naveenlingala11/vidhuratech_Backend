@@ -30,7 +30,7 @@ public class MentorQuestion {
 
     private String tags;
 
-    @Column(name = "media_url")
+    @Column(name = "media_url", columnDefinition = "TEXT")
     private String mediaUrl;
 
     @Column(name = "media_type")
