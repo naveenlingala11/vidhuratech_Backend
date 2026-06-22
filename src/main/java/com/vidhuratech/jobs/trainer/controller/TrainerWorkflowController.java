@@ -18,13 +18,13 @@ public class TrainerWorkflowController {
     private final TrainerWorkflowService service;
 
     @GetMapping("/mock-interviews")
-    @PreAuthorize("hasRole('TRAINER')")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMIN', 'SUPER_ADMIN', 'HR', 'MANAGER', 'MENTOR')")
     public ApiResponse<?> getMockInterviewRequests() {
         return ApiResponse.builder().success(true).data(service.getMockInterviewRequests()).build();
     }
 
     @PatchMapping("/mock-interviews/{id}")
-    @PreAuthorize("hasRole('TRAINER')")
+    @PreAuthorize("hasAnyRole('TRAINER', 'ADMIN', 'SUPER_ADMIN', 'HR', 'MANAGER', 'MENTOR')")
     public ApiResponse<?> updateMockInterview(@PathVariable Long id, @RequestBody Map<String, Object> payload) {
         return ApiResponse.builder()
                 .success(true)

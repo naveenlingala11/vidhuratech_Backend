@@ -3,9 +3,11 @@ package com.vidhuratech.jobs.jobs.service;
 import com.vidhuratech.jobs.jobs.entity.Company;
 import com.vidhuratech.jobs.jobs.entity.Job;
 import com.vidhuratech.jobs.jobs.entity.Skill;
+import com.vidhuratech.jobs.jobs.entity.ScraperConfigEntity;
 import com.vidhuratech.jobs.jobs.repository.CompanyRepository;
 import com.vidhuratech.jobs.jobs.repository.JobRepository;
 import com.vidhuratech.jobs.jobs.repository.SkillRepository;
+import com.vidhuratech.jobs.jobs.repository.ScraperConfigRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Service;
@@ -17,9 +19,13 @@ import java.util.*;
 @Service
 public class JobSeederService {
 
+    public static volatile boolean isSeeding = false;
+    public static volatile int currentSeedProgress = 0;
+
     private final JobRepository jobRepo;
     private final CompanyRepository companyRepo;
     private final SkillRepository skillRepo;
+    private final ScraperConfigRepository scraperConfigRepo;
     private final JobEnrichmentService enrichmentService;
 
     @PersistenceContext
@@ -28,10 +34,12 @@ public class JobSeederService {
     public JobSeederService(JobRepository jobRepo,
                             CompanyRepository companyRepo,
                             SkillRepository skillRepo,
+                            ScraperConfigRepository scraperConfigRepo,
                             JobEnrichmentService enrichmentService) {
         this.jobRepo = jobRepo;
         this.companyRepo = companyRepo;
         this.skillRepo = skillRepo;
+        this.scraperConfigRepo = scraperConfigRepo;
         this.enrichmentService = enrichmentService;
     }
 
@@ -226,231 +234,271 @@ public class JobSeederService {
         "Mumbai", "Chennai", "Kochi", "Coimbatore", "Kolkata"
     );
 
+    private String detectScraperType(String url) {
+        if (url == null) return "greenhouse";
+        String lower = url.toLowerCase();
+        if (lower.contains("workday")) {
+            return "workday";
+        } else if (lower.contains("lever.co")) {
+            return "lever";
+        } else if (lower.contains("smartrecruiters")) {
+            return "smartrecruiters";
+        } else if (lower.contains("greenhouse")) {
+            return "greenhouse";
+        }
+        return "greenhouse";
+    }
+
     @Transactional
     public Map<String, Object> seedJobs(int count, boolean cleanFirst) {
+        isSeeding = true;
+        currentSeedProgress = 0;
         long startTime = System.currentTimeMillis();
         Map<String, Object> response = new LinkedHashMap<>();
 
-        if (cleanFirst) {
-            System.out.println("🧹 CLEARING EXISTING JOB TABLES...");
-            entityManager.createNativeQuery("TRUNCATE TABLE job_skills CASCADE").executeUpdate();
-            entityManager.createNativeQuery("DELETE FROM jobs").executeUpdate();
-            entityManager.createNativeQuery("DELETE FROM companies").executeUpdate();
-            entityManager.createNativeQuery("DELETE FROM skills").executeUpdate();
-            entityManager.flush();
-            System.out.println("✅ TABLES CLEARED SUCCESSFULLY.");
-        }
+        try {
+            if (cleanFirst) {
+                System.out.println("🧹 CLEARING EXISTING JOB TABLES...");
+                entityManager.createNativeQuery("TRUNCATE TABLE job_skills CASCADE").executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM jobs").executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM companies").executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM skills").executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM scraper_configs").executeUpdate();
+                entityManager.flush();
+                System.out.println("✅ TABLES CLEARED SUCCESSFULLY.");
+            }
 
-        // 1. Pre-populate all skills into a Map to avoid database select trips
-        System.out.println("🌱 PRE-SEEDING SKILLS CLOUD...");
-        Map<String, Skill> skillsMap = new HashMap<>();
-        Map<String, String> rawSkills = enrichmentService.buildSkillMap();
-        for (String skillName : rawSkills.values()) {
-            Skill skill = skillRepo.findByNameIgnoreCase(skillName)
-                    .orElseGet(() -> skillRepo.save(new Skill(null, skillName)));
-            skillsMap.put(skillName.toLowerCase(), skill);
-        }
-        skillRepo.flush();
+            // 1. Pre-populate all skills into a Map to avoid database select trips
+            System.out.println("🌱 PRE-SEEDING SKILLS CLOUD...");
+            Map<String, Skill> skillsMap = new HashMap<>();
+            Map<String, String> rawSkills = enrichmentService.buildSkillMap();
+            for (String skillName : rawSkills.values()) {
+                Skill skill = skillRepo.findByNameIgnoreCase(skillName)
+                        .orElseGet(() -> skillRepo.save(new Skill(null, skillName)));
+                skillsMap.put(skillName.toLowerCase(), skill);
+            }
+            skillRepo.flush();
 
-        // 2. Pre-populate and save all companies into a Map
-        System.out.println("🌱 PRE-SEEDING CORPORATE BRANDS...");
-        Map<String, Company> companyMap = new HashMap<>();
-        for (CompanyInfo compInfo : COMPANIES_LIST) {
-            Company company = companyRepo.findByNameIgnoreCase(compInfo.name)
-                    .orElseGet(() -> {
-                        Company c = new Company();
-                        c.setName(compInfo.name);
-                        c.setWebsite(compInfo.website);
-                        c.setLogoUrl("https://www.google.com/s2/favicons?domain=" + compInfo.name.toLowerCase().replace(" ", "") + ".com&sz=128");
-                        return companyRepo.save(c);
-                    });
-            companyMap.put(compInfo.name.toLowerCase(), company);
-        }
-        companyRepo.flush();
+            // 2. Pre-populate and save all companies into a Map
+            System.out.println("🌱 PRE-SEEDING CORPORATE BRANDS...");
+            Map<String, Company> companyMap = new HashMap<>();
+            for (CompanyInfo compInfo : COMPANIES_LIST) {
+                Company company = companyRepo.findByNameIgnoreCase(compInfo.name)
+                        .orElseGet(() -> {
+                            Company c = new Company();
+                            c.setName(compInfo.name);
+                            c.setWebsite(compInfo.website);
+                            c.setLogoUrl("https://www.google.com/s2/favicons?domain=" + compInfo.name.toLowerCase().replace(" ", "") + ".com&sz=128");
+                            return companyRepo.save(c);
+                        });
+                companyMap.put(compInfo.name.toLowerCase(), company);
 
-        // 3. Generate and batch insert jobs
-        System.out.println("🚀 GENERATING " + count + " HIGH-FIDELITY OPPORTUNITIES...");
-        Random rand = new Random();
-        List<Job> batchJobs = new ArrayList<>();
-        int savedCount = 0;
+                // Seed scraper config if not present
+                Optional<ScraperConfigEntity> scraperOpt = scraperConfigRepo.findByCompany(compInfo.name);
+                if (scraperOpt.isEmpty()) {
+                    ScraperConfigEntity sc = new ScraperConfigEntity();
+                    sc.setCompany(compInfo.name);
+                    sc.setUrl(compInfo.careerUrl);
+                    sc.setType(detectScraperType(compInfo.careerUrl));
+                    sc.setActive(true);
+                    sc.setSuccessCount(0);
+                    sc.setFailCount(0);
+                    scraperConfigRepo.save(sc);
+                }
+            }
+            companyRepo.flush();
+            scraperConfigRepo.flush();
 
-        for (int i = 0; i < count; i++) {
-            // Randomly select company and template
-            CompanyInfo compInfo = COMPANIES_LIST.get(rand.nextInt(COMPANIES_LIST.size()));
-            Company company = companyMap.get(compInfo.name.toLowerCase());
+            // 3. Generate and batch insert jobs
+            System.out.println("🚀 GENERATING " + count + " HIGH-FIDELITY OPPORTUNITIES...");
+            Random rand = new Random();
+            List<Job> batchJobs = new ArrayList<>();
+            int savedCount = 0;
 
-            RoleTemplate template = ROLE_TEMPLATES.get(rand.nextInt(ROLE_TEMPLATES.size()));
+            for (int i = 0; i < count; i++) {
+                // Randomly select company and template
+                CompanyInfo compInfo = COMPANIES_LIST.get(rand.nextInt(COMPANIES_LIST.size()));
+                Company company = companyMap.get(compInfo.name.toLowerCase());
 
-            Job job = new Job();
-            job.setTitle(template.title);
-            job.setRole(template.roleCategory);
-            job.setCompany(company);
-            job.setSource("Corporate Board");
-            job.setCreatedAt(LocalDateTime.now());
+                RoleTemplate template = ROLE_TEMPLATES.get(rand.nextInt(ROLE_TEMPLATES.size()));
 
-            // Check if walkin
-            boolean isWalkIn = template.title.toLowerCase().contains("walk-in") || template.title.toLowerCase().contains("walkin");
+                Job job = new Job();
+                job.setTitle(template.title);
+                job.setRole(template.roleCategory);
+                job.setCompany(company);
+                job.setSource("Corporate Board");
+                job.setCreatedAt(LocalDateTime.now());
 
-            // Randomize Remote status vs. specific Indian hub
-            if (isWalkIn) {
-                // Walk-ins must be on-site
-                job.setRemote(false);
-                job.setLocation(INDIAN_LOCATIONS.get(rand.nextInt(INDIAN_LOCATIONS.size())));
-            } else {
-                boolean isRemote = rand.nextBoolean();
-                if (isRemote || template.title.toLowerCase().contains("remote")) {
-                    job.setRemote(true);
-                    job.setLocation("Remote");
-                } else {
+                // Check if walkin
+                boolean isWalkIn = template.title.toLowerCase().contains("walk-in") || template.title.toLowerCase().contains("walkin");
+
+                // Randomize Remote status vs. specific Indian hub
+                if (isWalkIn) {
+                    // Walk-ins must be on-site
                     job.setRemote(false);
                     job.setLocation(INDIAN_LOCATIONS.get(rand.nextInt(INDIAN_LOCATIONS.size())));
-                }
-            }
-
-            // Assign Experience and Job Type
-            if (template.isInternship) {
-                job.setJobType("Internship");
-                job.setEmploymentType("Internship");
-                job.setExperience("0-1 years");
-                job.setMinExperience(0);
-                job.setMaxExperience(1);
-            } else if (isWalkIn) {
-                job.setJobType("Walk-in");
-                job.setEmploymentType("Walk-in");
-                int expOption = rand.nextInt(2);
-                if (expOption == 0) {
-                    job.setExperience("0-2 years");
-                    job.setMinExperience(0);
-                    job.setMaxExperience(2);
                 } else {
-                    job.setExperience("1-4 years");
-                    job.setMinExperience(1);
-                    job.setMaxExperience(4);
-                }
-            } else {
-                job.setJobType("Full-time");
-                job.setEmploymentType("Full-time");
-                // Randomize experience ranges
-                int expOption = rand.nextInt(5);
-                if (expOption == 0) { // Entry level (Fresher)
-                    job.setExperience("0-2 years");
-                    job.setMinExperience(0);
-                    job.setMaxExperience(2);
-                } else if (expOption == 1) { // Mid level
-                    job.setExperience("3-5 years");
-                    job.setMinExperience(3);
-                    job.setMaxExperience(5);
-                } else if (expOption == 2) { // Senior
-                    job.setExperience("5-8 years");
-                    job.setMinExperience(5);
-                    job.setMaxExperience(8);
-                } else if (expOption == 3) { // Lead
-                    job.setExperience("8-12 years");
-                    job.setMinExperience(8);
-                    job.setMaxExperience(12);
-                } else { // Manager/Director
-                    job.setExperience("10+ years");
-                    job.setMinExperience(10);
-                    job.setMaxExperience(15);
-                }
-            }
-
-            // Category classification
-            job.setCategory(enrichmentService.detectCategory(template.title));
-
-            // Compensation mapping
-            if (template.isInternship) {
-                int stipend = 15000 + rand.nextInt(35000);
-                job.setSalary(String.format("₹%,d - ₹%,d / month", stipend, stipend + 15000));
-            } else {
-                int minExp = job.getMinExperience();
-                if (minExp <= 2) { // Entry
-                    int base = 400000 + rand.nextInt(400000);
-                    job.setSalary(String.format("₹%,d - ₹%,d L.P.A", base, base + 300000));
-                } else if (minExp <= 5) { // Mid
-                    int base = 1000000 + rand.nextInt(800000);
-                    job.setSalary(String.format("₹%,d - ₹%,d L.P.A", base, base + 500000));
-                } else if (minExp <= 8) { // Senior
-                    int base = 2000000 + rand.nextInt(1200000);
-                    job.setSalary(String.format("₹%,d - ₹%,d L.P.A", base, base + 800000));
-                } else { // Lead/Manager
-                    int base = 3500000 + rand.nextInt(2500000);
-                    job.setSalary(String.format("₹%,d - ₹%,d L.P.A", base, base + 1500000));
-                }
-            }
-
-            // Generate authentic specific apply URL
-            job.setApplyLink(compInfo.careerUrl);
-
-            // Assign Skills Cloud
-            Set<Skill> jobSkills = new HashSet<>();
-            List<String> assignedSkillsList = new ArrayList<>();
-
-            // 2-3 primary skills
-            for (String ps : template.primarySkills) {
-                Skill skill = skillsMap.get(ps.toLowerCase());
-                if (skill != null) {
-                    jobSkills.add(skill);
-                    assignedSkillsList.add(ps);
-                }
-            }
-            // 1-2 secondary skills
-            int secondaryCount = 1 + rand.nextInt(2);
-            for (int k = 0; k < secondaryCount; k++) {
-                String ss = template.secondarySkills.get(rand.nextInt(template.secondarySkills.size()));
-                Skill skill = skillsMap.get(ss.toLowerCase());
-                if (skill != null) {
-                    jobSkills.add(skill);
-                    if (!assignedSkillsList.contains(ss)) {
-                        assignedSkillsList.add(ss);
+                    boolean isRemote = rand.nextBoolean();
+                    if (isRemote || template.title.toLowerCase().contains("remote")) {
+                        job.setRemote(true);
+                        job.setLocation("Remote");
+                    } else {
+                        job.setRemote(false);
+                        job.setLocation(INDIAN_LOCATIONS.get(rand.nextInt(INDIAN_LOCATIONS.size())));
                     }
                 }
+
+                // Assign Experience and Job Type
+                if (template.isInternship) {
+                    job.setJobType("Internship");
+                    job.setEmploymentType("Internship");
+                    job.setExperience("0-1 years");
+                    job.setMinExperience(0);
+                    job.setMaxExperience(1);
+                } else if (isWalkIn) {
+                    job.setJobType("Walk-in");
+                    job.setEmploymentType("Walk-in");
+                    int expOption = rand.nextInt(2);
+                    if (expOption == 0) {
+                        job.setExperience("0-2 years");
+                        job.setMinExperience(0);
+                        job.setMaxExperience(2);
+                    } else {
+                        job.setExperience("1-4 years");
+                        job.setMinExperience(1);
+                        job.setMaxExperience(4);
+                    }
+                } else {
+                    job.setJobType("Full-time");
+                    job.setEmploymentType("Full-time");
+                    // Randomize experience ranges
+                    int expOption = rand.nextInt(5);
+                    if (expOption == 0) { // Entry level (Fresher)
+                        job.setExperience("0-2 years");
+                        job.setMinExperience(0);
+                        job.setMaxExperience(2);
+                    } else if (expOption == 1) { // Mid level
+                        job.setExperience("3-5 years");
+                        job.setMinExperience(3);
+                        job.setMaxExperience(5);
+                    } else if (expOption == 2) { // Senior
+                        job.setExperience("5-8 years");
+                        job.setMinExperience(5);
+                        job.setMaxExperience(8);
+                    } else if (expOption == 3) { // Lead
+                        job.setExperience("8-12 years");
+                        job.setMinExperience(8);
+                        job.setMaxExperience(12);
+                    } else { // Manager/Director
+                        job.setExperience("10+ years");
+                        job.setMinExperience(10);
+                        job.setMaxExperience(15);
+                    }
+                }
+
+                // Category classification
+                job.setCategory(enrichmentService.detectCategory(template.title));
+
+                // Compensation mapping
+                if (template.isInternship) {
+                    int stipend = 15000 + rand.nextInt(35000);
+                    job.setSalary(String.format("₹%,d - ₹%,d / month", stipend, stipend + 15000));
+                } else {
+                    int minExp = job.getMinExperience();
+                    if (minExp <= 2) { // Entry
+                        int base = 400000 + rand.nextInt(400000);
+                        job.setSalary(String.format("₹%,d - ₹%,d L.P.A", base, base + 300000));
+                    } else if (minExp <= 5) { // Mid
+                        int base = 1000000 + rand.nextInt(800000);
+                        job.setSalary(String.format("₹%,d - ₹%,d L.P.A", base, base + 500000));
+                    } else if (minExp <= 8) { // Senior
+                        int base = 2000000 + rand.nextInt(1200000);
+                        job.setSalary(String.format("₹%,d - ₹%,d L.P.A", base, base + 800000));
+                    } else { // Lead/Manager
+                        int base = 3500000 + rand.nextInt(2500000);
+                        job.setSalary(String.format("₹%,d - ₹%,d L.P.A", base, base + 1500000));
+                    }
+                }
+
+                // Generate authentic specific apply URL (appended with unique seed parameter to prevent unique constraint violation)
+                String baseLink = compInfo.careerUrl;
+                String uniqueLink = baseLink + (baseLink.contains("?") ? "&" : "?") + "ref=vidhuratech_seed_" + UUID.randomUUID().toString().replace("-", "");
+                job.setApplyLink(uniqueLink);
+
+                // Assign Skills Cloud
+                Set<Skill> jobSkills = new HashSet<>();
+                List<String> assignedSkillsList = new ArrayList<>();
+
+                // 2-3 primary skills
+                for (String ps : template.primarySkills) {
+                    Skill skill = skillsMap.get(ps.toLowerCase());
+                    if (skill != null) {
+                        jobSkills.add(skill);
+                        assignedSkillsList.add(ps);
+                    }
+                }
+                // 1-2 secondary skills
+                int secondaryCount = 1 + rand.nextInt(2);
+                for (int k = 0; k < secondaryCount; k++) {
+                    String ss = template.secondarySkills.get(rand.nextInt(template.secondarySkills.size()));
+                    Skill skill = skillsMap.get(ss.toLowerCase());
+                    if (skill != null) {
+                        jobSkills.add(skill);
+                        if (!assignedSkillsList.contains(ss)) {
+                            assignedSkillsList.add(ss);
+                        }
+                    }
+                }
+                job.setSkills(jobSkills);
+                job.setSkillsCsv(String.join(",", assignedSkillsList));
+
+                // Dynamic HTML Description
+                job.setDescription(generateDescription(
+                        job.getTitle(),
+                        compInfo.name,
+                        job.getLocation(),
+                        job.getExperience(),
+                        job.getSalary(),
+                        assignedSkillsList,
+                        isWalkIn
+                ));
+
+                // Randomize postedAt in last 30 days
+                job.setPostedAt(LocalDateTime.now().minusDays(rand.nextInt(30)).minusHours(rand.nextInt(24)));
+
+                batchJobs.add(job);
+
+                // Save in batches of 1000 using entity manager to control memory overhead
+                if (batchJobs.size() >= 1000) {
+                    saveBatch(batchJobs);
+                    savedCount += batchJobs.size();
+                    currentSeedProgress = savedCount;
+                    batchJobs.clear();
+                    System.out.println("💾 Seeded batch: " + savedCount + " jobs...");
+                }
             }
-            job.setSkills(jobSkills);
-            job.setSkillsCsv(String.join(",", assignedSkillsList));
 
-            // Dynamic HTML Description
-            job.setDescription(generateDescription(
-                    job.getTitle(),
-                    compInfo.name,
-                    job.getLocation(),
-                    job.getExperience(),
-                    job.getSalary(),
-                    assignedSkillsList,
-                    isWalkIn
-            ));
-
-            // Randomize postedAt in last 30 days
-            job.setPostedAt(LocalDateTime.now().minusDays(rand.nextInt(30)).minusHours(rand.nextInt(24)));
-
-            batchJobs.add(job);
-
-            // Save in batches of 1000 using entity manager to control memory overhead
-            if (batchJobs.size() >= 1000) {
+            // Insert remaining records
+            if (!batchJobs.isEmpty()) {
                 saveBatch(batchJobs);
                 savedCount += batchJobs.size();
+                currentSeedProgress = savedCount;
                 batchJobs.clear();
-                System.out.println("💾 Seeded batch: " + savedCount + " jobs...");
             }
+
+            long duration = System.currentTimeMillis() - startTime;
+            System.out.println("🎉 SEEDING COMPLETED! Total time taken: " + duration + " ms.");
+
+            response.put("status", "SUCCESS");
+            response.put("jobsSeededCount", savedCount);
+            response.put("companiesCount", companyMap.size());
+            response.put("skillsCount", skillsMap.size());
+            response.put("timeTakenMs", duration);
+
+            return response;
+        } finally {
+            isSeeding = false;
         }
-
-        // Insert remaining records
-        if (!batchJobs.isEmpty()) {
-            saveBatch(batchJobs);
-            savedCount += batchJobs.size();
-            batchJobs.clear();
-        }
-
-        long duration = System.currentTimeMillis() - startTime;
-        System.out.println("🎉 SEEDING COMPLETED! Total time taken: " + duration + " ms.");
-
-        response.put("status", "SUCCESS");
-        response.put("jobsSeededCount", savedCount);
-        response.put("companiesCount", companyMap.size());
-        response.put("skillsCount", skillsMap.size());
-        response.put("timeTakenMs", duration);
-
-        return response;
     }
 
     private void saveBatch(List<Job> jobs) {

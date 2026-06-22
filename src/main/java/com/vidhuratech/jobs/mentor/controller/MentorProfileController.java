@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/mentor/profile")
 @RequiredArgsConstructor
 @CrossOrigin("*")
-@PreAuthorize("hasRole('MENTOR')")
+@PreAuthorize("hasAnyRole('MENTOR', 'TRAINER', 'ADMIN', 'SUPER_ADMIN')")
 public class MentorProfileController {
 
     private final MentorProfileService service;
@@ -122,6 +122,16 @@ public class MentorProfileController {
         }
         service.submitFeedback(userId, request.getStudentName(), request.getProgress(), request.getMilestone(), request.getNote());
         return ApiResponse.success(null, "Feedback saved successfully");
+    }
+
+    @PostMapping("/sessions/{id}/invite")
+    public ApiResponse<?> sendInvite(@PathVariable Long id) {
+        Long userId = securityUtils.getCurrentUserId();
+        if (userId == null) {
+            return ApiResponse.error("User not authenticated");
+        }
+        service.sendSessionInvite(userId, id);
+        return ApiResponse.success(null, "Session invitation sent successfully via Email & In-App Notification!");
     }
 
     @lombok.Data

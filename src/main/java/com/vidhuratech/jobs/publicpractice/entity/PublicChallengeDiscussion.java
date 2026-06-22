@@ -24,7 +24,7 @@ public class PublicChallengeDiscussion {
     @Column(length = 180)
     private String authorEmail;
 
-    @Column(length = 1000)
+    @Column(columnDefinition = "TEXT")
     private String authorProfileImageUrl;
 
     @Column(length = 140)

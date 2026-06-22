@@ -58,6 +58,7 @@ public class Invoice {
 
     private String utrNumber;
 
+    @Column(name = "payment_screenshot_url", columnDefinition = "TEXT")
     private String paymentScreenshotUrl;
 
     private Boolean paymentVerified;

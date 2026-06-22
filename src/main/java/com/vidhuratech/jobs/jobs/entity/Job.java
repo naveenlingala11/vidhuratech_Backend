@@ -44,7 +44,7 @@ public class Job {
     @Column(length = 10000)
     private String description;
 
-    @Column(name = "apply_link", length = 1000)
+    @Column(name = "apply_link", columnDefinition = "TEXT")
     private String applyLink;
 
     // ✅ FIX: No cascade here (important)

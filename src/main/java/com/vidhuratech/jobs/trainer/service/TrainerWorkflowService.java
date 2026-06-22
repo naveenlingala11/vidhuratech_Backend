@@ -10,6 +10,9 @@ import com.vidhuratech.jobs.trainer.entity.*;
 import com.vidhuratech.jobs.trainer.repository.MockInterviewRequestRepository;
 import com.vidhuratech.jobs.trainer.repository.TrainingSubmissionRepository;
 import com.vidhuratech.jobs.trainer.repository.TrainingWorkItemRepository;
+import com.vidhuratech.jobs.user.repository.UserRepository;
+import com.vidhuratech.jobs.user.enums.UserRole;
+import com.vidhuratech.jobs.user.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +27,7 @@ import java.util.Map;
 public class TrainerWorkflowService {
 
     private final SecurityUtils securityUtils;
+    private final UserRepository userRepository;
     private final BatchRepository batchRepository;
     private final BatchEnrollmentRepository enrollmentRepository;
     private final TrainingWorkItemRepository workItemRepository;
@@ -44,9 +48,18 @@ public class TrainerWorkflowService {
 
     public List<Map<String, Object>> getMockInterviewRequests() {
         String email = securityUtils.getCurrentUserEmail();
-        return mockRepository.findByTrainerEmailOrderByCreatedAtDesc(email).stream()
-                .map(this::mapMock)
-                .toList();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (user.getRole() == UserRole.ADMIN || user.getRole() == UserRole.SUPER_ADMIN) {
+            return mockRepository.findAll().stream()
+                    .map(this::mapMock)
+                    .toList();
+        } else {
+            return mockRepository.findByTrainerEmailOrderByCreatedAtDesc(email).stream()
+                    .map(this::mapMock)
+                    .toList();
+        }
     }
 
     public Map<String, Object> updateMockInterview(Long id, Map<String, Object> payload) {
@@ -55,8 +68,13 @@ public class TrainerWorkflowService {
         MockInterviewRequest request = mockRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Mock interview request not found"));
 
-        if (request.getTrainer() == null || !email.equals(request.getTrainer().getEmail())) {
-            throw new RuntimeException("Access denied");
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (user.getRole() != UserRole.ADMIN && user.getRole() != UserRole.SUPER_ADMIN) {
+            if (request.getTrainer() == null || !email.equals(request.getTrainer().getEmail())) {
+                throw new RuntimeException("Access denied");
+            }
         }
 
         String statusValue = payload.getOrDefault("status", request.getStatus()).toString();

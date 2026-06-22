@@ -34,7 +34,7 @@ public class MentorProfile {
     @Column(columnDefinition = "TEXT")
     private String biography;
 
-    @Column(length = 1000)
+    @Column(columnDefinition = "TEXT")
     private String skills;
 
     private String languages;
@@ -87,7 +87,7 @@ public class MentorProfile {
     @Column(name = "terms_verified")
     private Boolean termsVerified = false;
 
-    @Column(name = "verification_document_url", length = 1000)
+    @Column(name = "verification_document_url", columnDefinition = "TEXT")
     private String verificationDocumentUrl;
 
     @Column(name = "created_at", updatable = false)
