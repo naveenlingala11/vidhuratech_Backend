@@ -14,7 +14,7 @@ public class StudentLmsController {
     private final StudentLmsService service;
 
     @GetMapping("/batches")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'USER')")
     public ApiResponse<?> myBatches() {
         return ApiResponse.builder()
                 .success(true)
@@ -23,7 +23,7 @@ public class StudentLmsController {
     }
 
     @GetMapping("/batches/{batchId}/sessions")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'USER')")
     public ApiResponse<?> sessions(@PathVariable Long batchId) {
         return ApiResponse.builder()
                 .success(true)
@@ -32,7 +32,7 @@ public class StudentLmsController {
     }
 
     @GetMapping("/batches/{batchId}/curriculum")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'USER')")
     public ApiResponse<?> curriculum(@PathVariable Long batchId) {
 
         return ApiResponse.builder()

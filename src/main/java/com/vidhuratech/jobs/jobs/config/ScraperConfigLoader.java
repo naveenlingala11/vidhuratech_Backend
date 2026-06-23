@@ -4,6 +4,7 @@ import com.vidhuratech.jobs.jobs.entity.ScraperConfigEntity;
 import com.vidhuratech.jobs.jobs.repository.ScraperConfigRepository;
 import com.vidhuratech.jobs.jobs.scraper.engine.ApiConfig;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 
@@ -16,6 +17,7 @@ public class ScraperConfigLoader {
         this.repo = repo;
     }
 
+    @Transactional
     public void load() {
         System.out.println("🚀 Refreshing/Loading scraper configurations into DB...");
         try {

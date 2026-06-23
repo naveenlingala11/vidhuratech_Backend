@@ -16,7 +16,7 @@ public class StudentDashboardController {
     private final StudentDashboardService service;
 
     @GetMapping("/dashboard")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'USER')")
     public ApiResponse<?> getDashboard() {
         return ApiResponse.builder()
                 .success(true)
@@ -49,7 +49,7 @@ public class StudentDashboardController {
     }
 
     @GetMapping("/learning-content")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'USER')")
     public ApiResponse<?> getLearningContent() {
         return ApiResponse.builder()
                 .success(true)

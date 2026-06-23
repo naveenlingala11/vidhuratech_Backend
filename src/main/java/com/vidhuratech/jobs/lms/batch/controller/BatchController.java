@@ -109,7 +109,7 @@ public class BatchController {
     }
 
     @GetMapping("/{batchId}/is-enrolled")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'USER')")
     public ApiResponse<?> isEnrolled(@PathVariable Long batchId) {
 
         Long userId = securityUtils.getCurrentUserId();

@@ -132,16 +132,21 @@ public class StudentWorkflowService {
     }
 
     private Map<String, Object> mapMock(MockInterviewRequest request) {
-        return Map.of(
-                "id", request.getId(),
-                "batch", request.getBatch() == null ? "" : request.getBatch().getName(),
-                "topic", request.getTopic() == null ? "" : request.getTopic(),
-                "preferredDate", request.getPreferredDate() == null ? "" : request.getPreferredDate(),
-                "preferredTime", request.getPreferredTime() == null ? "" : request.getPreferredTime(),
-                "status", request.getStatus() == null ? MockInterviewStatus.REQUESTED : request.getStatus(),
-                "meetingLink", request.getMeetingLink() == null ? "" : request.getMeetingLink(),
-                "trainerRemarks", request.getTrainerRemarks() == null ? "" : request.getTrainerRemarks()
-        );
+        java.util.Map<String, Object> map = new java.util.HashMap<>();
+        map.put("id", request.getId());
+        map.put("batch", request.getBatch() == null ? "" : request.getBatch().getName());
+        map.put("topic", request.getTopic() == null ? "" : request.getTopic());
+        map.put("preferredDate", request.getPreferredDate() == null ? "" : request.getPreferredDate());
+        map.put("preferredTime", request.getPreferredTime() == null ? "" : request.getPreferredTime());
+        map.put("status", request.getStatus() == null ? MockInterviewStatus.REQUESTED : request.getStatus());
+        map.put("meetingLink", request.getMeetingLink() == null ? "" : request.getMeetingLink());
+        map.put("trainerRemarks", request.getTrainerRemarks() == null ? "" : request.getTrainerRemarks());
+        map.put("expirationDate", request.getExpirationDate());
+        map.put("maxDurationMinutes", request.getMaxDurationMinutes() == null ? 60 : request.getMaxDurationMinutes());
+        map.put("isEnded", Boolean.TRUE.equals(request.getIsEnded()));
+        map.put("trainerEmail", request.getTrainer() == null ? "" : request.getTrainer().getEmail());
+        map.put("trainerName", request.getTrainer() == null ? "" : request.getTrainer().getName());
+        return map;
     }
 
     private Map<String, Object> mapSubmission(TrainingSubmission submission) {

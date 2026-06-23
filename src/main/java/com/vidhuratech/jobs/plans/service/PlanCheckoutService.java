@@ -218,6 +218,9 @@ public class PlanCheckoutService {
                     user.setActive(true);
                     user.setDeleted(false);
                     user.setUpdatedAt(LocalDateTime.now());
+                    if (user.getRole() == UserRole.USER) {
+                        user.setRole(UserRole.STUDENT);
+                    }
                     return userRepository.save(user);
                 })
                 .orElseGet(() -> {

@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/student/mentors")
 @RequiredArgsConstructor
 @CrossOrigin("*")
-@PreAuthorize("hasRole('STUDENT')")
+@PreAuthorize("hasAnyRole('STUDENT', 'USER')")
 public class StudentMentorController {
 
     private final StudentMentorService service;

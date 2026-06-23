@@ -64,5 +64,15 @@ public class TrainerWorkflowController {
                 .data(service.reviewSubmission(id, payload))
                 .build();
     }
+
+    @DeleteMapping("/mock-interviews/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ApiResponse<?> deleteMockInterview(@PathVariable Long id) {
+        service.deleteMockInterview(id);
+        return ApiResponse.builder()
+                .success(true)
+                .message("Mock interview session deleted successfully")
+                .build();
+    }
 }
 

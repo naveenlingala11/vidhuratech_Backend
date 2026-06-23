@@ -16,7 +16,7 @@ public class StudentWorkflowController {
     private final StudentWorkflowService service;
 
     @PostMapping("/mock-interviews")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'USER')")
     public ApiResponse<?> requestMockInterview(@RequestBody Map<String, Object> payload) {
         return ApiResponse.builder()
                 .success(true)
@@ -26,19 +26,19 @@ public class StudentWorkflowController {
     }
 
     @GetMapping("/mock-interviews")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'USER')")
     public ApiResponse<?> myMockInterviews() {
         return ApiResponse.builder().success(true).data(service.getMyMockInterviews()).build();
     }
 
     @GetMapping("/work-items")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'USER')")
     public ApiResponse<?> myWorkItems() {
         return ApiResponse.builder().success(true).data(service.getMyWorkItems()).build();
     }
 
     @PostMapping("/work-items/{id}/submit")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'USER')")
     public ApiResponse<?> submitWork(@PathVariable Long id, @RequestBody Map<String, Object> payload) {
         return ApiResponse.builder()
                 .success(true)

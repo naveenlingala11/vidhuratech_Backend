@@ -213,6 +213,10 @@ public class CheckoutService {
 
         if (existingUser.isPresent()) {
             user = existingUser.get();
+            if (user.getRole() == UserRole.USER) {
+                user.setRole(UserRole.STUDENT);
+                user = userRepo.save(user);
+            }
         } else {
 
             user = new User();
