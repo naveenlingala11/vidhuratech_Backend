@@ -9,13 +9,13 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/student/interview-questions")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('STUDENT')")
+@PreAuthorize("hasAnyRole('STUDENT', 'USER')")
 public class StudentInterviewQuestionController {
 
     private final StudentInterviewQuestionService service;
 
     @GetMapping
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'USER')")
     public ApiResponse<?> myQuestions(
             @RequestParam(defaultValue = "") String company,
             @RequestParam(defaultValue = "") String role,

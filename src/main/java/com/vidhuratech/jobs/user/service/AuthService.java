@@ -56,7 +56,7 @@ public class AuthService {
         user.setEmail(email);
         user.setPhone(request.getPhone());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setRole(UserRole.STUDENT);
+        user.setRole(UserRole.USER);
         user.setActive(true);
         user.setFirstLogin(false);
         user.setCreatedAt(LocalDateTime.now());
@@ -223,11 +223,11 @@ public class AuthService {
         User user = userRepo.findByEmail(normalizedEmail)
                 .orElseGet(() -> {
                     User newUser = new User();
-                    newUser.setName(name == null || name.isBlank() ? "Student" : name.trim());
+                    newUser.setName(name == null || name.isBlank() ? "User" : name.trim());
                     newUser.setEmail(normalizedEmail);
                     newUser.setPhone(phone == null ? "" : phone.trim());
                     newUser.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
-                    newUser.setRole(UserRole.STUDENT);
+                    newUser.setRole(UserRole.USER);
                     newUser.setActive(true);
                     newUser.setFirstLogin(false);
                     newUser.setCreatedAt(LocalDateTime.now());
@@ -251,11 +251,11 @@ public class AuthService {
 
     private User createPhoneUser(String phone) {
         User user = new User();
-        user.setName("Student " + phone.substring(phone.length() - 4));
+        user.setName("User " + phone.substring(phone.length() - 4));
         user.setEmail("phone-" + phone + "@phone.vidhuratech.local");
         user.setPhone(phone);
         user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
-        user.setRole(UserRole.STUDENT);
+        user.setRole(UserRole.USER);
         user.setActive(true);
         user.setFirstLogin(false);
         user.setCreatedAt(LocalDateTime.now());

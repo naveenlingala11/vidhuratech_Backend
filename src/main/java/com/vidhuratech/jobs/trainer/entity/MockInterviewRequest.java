@@ -22,11 +22,11 @@ public class MockInterviewRequest {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(optional = false)
+    @ManyToOne
     @JoinColumn(name = "student_id")
     private User student;
 
-    @ManyToOne(optional = false)
+    @ManyToOne
     @JoinColumn(name = "batch_id")
     private Batch batch;
 
@@ -51,6 +51,55 @@ public class MockInterviewRequest {
 
     @Column(length = 2000)
     private String trainerRemarks;
+
+    @Column(columnDefinition = "TEXT")
+    private String sessionSummary;
+
+    @Column(columnDefinition = "TEXT")
+    private String sessionChat;
+
+    private LocalDateTime expirationDate;
+
+    private Integer maxDurationMinutes;
+
+    private Integer actualDurationMinutes;
+
+    @Builder.Default
+    private Boolean isEnded = false;
+
+    private Integer participantCount;
+
+    @Column(columnDefinition = "TEXT")
+    private String meetingLogs;
+
+    private String candidateName;
+
+    private String candidateEmail;
+
+    private String hostName;
+
+    private String hostEmail;
+
+    private String hostRole;
+
+    @Builder.Default
+    private Boolean isPublic = false;
+
+    @Builder.Default
+    private Integer joinCount = 0;
+
+    @Builder.Default
+    private String recurringType = "ONCE";
+
+    private String recurringDays;
+
+    @Column(columnDefinition = "TEXT")
+    private String invitedEmails;
+
+    private LocalTime preferredEndTime;
+
+    @Builder.Default
+    private String timezone = "Asia/Kolkata";
 
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

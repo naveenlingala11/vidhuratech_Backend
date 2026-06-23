@@ -13,11 +13,12 @@ public class RoleHierarchyUtil {
             case ADMIN -> target == UserRole.TRAINER
                     || target == UserRole.HR
                     || target == UserRole.MANAGER
-                    || target == UserRole.MENTOR;
+                    || target == UserRole.MENTOR
+                    || target == UserRole.USER;
 
             case MANAGER -> target == UserRole.MENTOR;
 
-            case HR -> target == UserRole.STUDENT;
+            case HR -> target == UserRole.STUDENT || target == UserRole.USER;
 
             default -> false;
         };

@@ -93,7 +93,7 @@ public class OtpService {
         user.setEmail(req.getEmail());
         user.setPhone(req.getPhone());
         user.setPassword(passwordEncoder.encode(req.getPassword()));
-        user.setRole(UserRole.STUDENT);
+        user.setRole(UserRole.USER);
         user.setActive(true);
 
         userRepo.save(user);

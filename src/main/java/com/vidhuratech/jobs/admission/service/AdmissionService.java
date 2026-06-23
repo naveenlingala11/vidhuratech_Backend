@@ -73,6 +73,10 @@ public class AdmissionService {
             // =========================================
 
             user = existingUser.get();
+            if (user.getRole() == UserRole.USER) {
+                user.setRole(UserRole.STUDENT);
+                user = userRepo.save(user);
+            }
 
             existingStudent = true;
 

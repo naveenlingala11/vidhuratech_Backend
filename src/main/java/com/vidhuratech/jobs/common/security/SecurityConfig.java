@@ -118,9 +118,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**", "/jobs/admin/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
                         .requestMatchers("/api/hr/**").hasRole("HR")
                         .requestMatchers("/api/manager/**").hasRole("MANAGER")
+                        .requestMatchers("/api/trainer/mock-interviews", "/api/trainer/mock-interviews/**").hasAnyRole("TRAINER", "ADMIN", "SUPER_ADMIN", "HR", "MANAGER", "MENTOR")
                         .requestMatchers("/api/trainer/**").hasRole("TRAINER")
                         .requestMatchers("/api/mentor/**").hasRole("MENTOR")
-                        .requestMatchers("/api/student/**").hasAnyRole("STUDENT", "ADMIN", "SUPER_ADMIN")
+                        .requestMatchers("/api/student/**").hasAnyRole("STUDENT", "USER", "ADMIN", "SUPER_ADMIN")
                         .requestMatchers("/api/users/**").hasAnyRole("SUPER_ADMIN", "ADMIN", "MANAGER", "HR")
 
                         .requestMatchers("/api/lms/admin/**").hasAnyRole("ADMIN", "SUPER_ADMIN", "HR")
@@ -130,7 +131,8 @@ public class SecurityConfig {
                                 "ADMIN",
                                 "TRAINER",
                                 "MENTOR",
-                                "STUDENT"
+                                "STUDENT",
+                                "USER"
                         )
 
                         .requestMatchers(HttpMethod.GET, "/certificates/*/download").permitAll()

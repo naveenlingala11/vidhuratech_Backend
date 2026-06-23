@@ -7,5 +7,6 @@ public enum UserRole {
     HR,
     MANAGER,
     SUPER_ADMIN,
-    MENTOR
+    MENTOR,
+    USER
 }
