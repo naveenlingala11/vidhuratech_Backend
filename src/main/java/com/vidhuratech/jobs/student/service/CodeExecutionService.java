@@ -12,6 +12,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -23,7 +24,7 @@ public class CodeExecutionService {
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
-    @Value("${onlinecompiler.base-url:https://api.onlinecompiler.io}")
+    @Value("${onlinecompiler.base-url:https://judge0-ce.p.rapidapi.com}")
     private String baseUrl;
 
     @Value("${onlinecompiler.api-key:}")
@@ -31,31 +32,36 @@ public class CodeExecutionService {
 
     public ExecutionResult run(String language, String sourceCode, String inputData) {
         try {
-            if (!hasText(apiKey)) {
-                return ExecutionResult.builder()
-                        .success(false)
-                        .output("")
-                        .error("OnlineCompiler API key is missing")
-                        .executionTimeMs(0L)
-                        .build();
-            }
-
             String normalizedLanguage = normalizeLanguage(language);
+            Integer langId = judge0LanguageId(normalizedLanguage);
             String wrappedCode = wrapSourceCode(normalizedLanguage, sourceCode == null ? "" : sourceCode);
 
+            String base64Code = encodeBase64(wrappedCode);
+            String base64Input = encodeBase64(inputData == null ? "" : inputData);
+
             Map<String, Object> body = new LinkedHashMap<>();
-            body.put("compiler", compiler(normalizedLanguage));
-            body.put("code", wrappedCode);
-            body.put("input", inputData == null ? "" : inputData);
+            body.put("source_code", base64Code);
+            body.put("language_id", langId);
+            body.put("stdin", base64Input);
 
-            String url = cleanBaseUrl(baseUrl) + "/api/run-code-sync/";
+            String url = cleanBaseUrl(baseUrl) + "/submissions?wait=true&base64_encoded=true";
 
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest.Builder builder = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .header("Authorization", apiKey)
                     .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
-                    .build();
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)));
+
+            if (url.contains("rapidapi.com")) {
+                if (hasText(apiKey)) {
+                    builder.header("x-rapidapi-key", apiKey);
+                }
+                builder.header("x-rapidapi-host", URI.create(url).getHost());
+            } else if (hasText(apiKey)) {
+                builder.header("Authorization", apiKey);
+                builder.header("X-Auth-Token", apiKey);
+            }
+
+            HttpRequest request = builder.build();
 
             HttpResponse<String> response = httpClient.send(
                     request,
@@ -68,7 +74,7 @@ public class CodeExecutionService {
                 return ExecutionResult.builder()
                         .success(false)
                         .output("")
-                        .error("OnlineCompiler HTTP " + response.statusCode() + ": " + rawBody)
+                        .error("Judge0 HTTP " + response.statusCode() + ": " + rawBody)
                         .executionTimeMs(0L)
                         .build();
             }
@@ -78,44 +84,39 @@ public class CodeExecutionService {
                     new TypeReference<Map<String, Object>>() {}
             );
 
-            String output = firstText(
-                    stringValue(result.get("output")),
-                    stringValue(result.get("stdout"))
-            );
+            String stdout = decodeBase64(stringValue(result.get("stdout")));
+            String stderr = decodeBase64(stringValue(result.get("stderr")));
+            String compileOutput = decodeBase64(stringValue(result.get("compile_output")));
+            String message = decodeBase64(stringValue(result.get("message")));
 
-            String error = firstText(
-                    stringValue(result.get("error")),
-                    stringValue(result.get("stderr")),
-                    stringValue(result.get("compile_output")),
-                    stringValue(result.get("message")),
-                    stringValue(result.get("exception")),
-                    stringValue(result.get("details"))
-            );
+            Map<String, Object> statusMap = (Map<String, Object>) result.get("status");
+            int statusId = 0;
+            String statusDescription = "";
+            if (statusMap != null) {
+                statusId = intValue(statusMap.get("id"));
+                statusDescription = stringValue(statusMap.get("description"));
+            }
 
-            String status = stringValue(result.get("status"));
-            int exitCode = intValue(result.get("exit_code"));
-
-            boolean success =
-                    "success".equalsIgnoreCase(status)
-                            && exitCode == 0
-                            && !hasText(error);
+            boolean success = (statusId == 3);
 
             String finalError = "";
             if (!success) {
-                if (hasText(error)) {
-                    finalError = error;
-                } else if (hasText(output) && !"success".equalsIgnoreCase(status)) {
-                    finalError = output;
+                if (statusId == 6) {
+                    finalError = hasText(compileOutput) ? compileOutput : "Compilation Error";
+                } else if (hasText(stderr)) {
+                    finalError = stderr;
+                } else if (hasText(message)) {
+                    finalError = message;
                 } else {
-                    finalError = "Code execution failed.\nRaw compiler response:\n" + rawBody;
+                    finalError = "Execution failed with status: " + statusDescription;
                 }
             }
 
             return ExecutionResult.builder()
                     .success(success)
-                    .output(output)
+                    .output(stdout)
                     .error(finalError)
-                    .executionTimeMs(timeToMillis(result.get("total")))
+                    .executionTimeMs(timeToMillis(result.get("time")))
                     .build();
 
         } catch (Exception e) {
@@ -128,19 +129,19 @@ public class CodeExecutionService {
         }
     }
 
-    private static final Map<String, String> COMPILERS = Map.ofEntries(
-            Map.entry("JAVA", "openjdk-25"),
-            Map.entry("PYTHON", "python-3.14"),
-            Map.entry("C", "gcc-15"),
-            Map.entry("CPP", "g++-15"),
-            Map.entry("CSHARP", "dotnet-csharp-9"),
-            Map.entry("FSHARP", "dotnet-fsharp-9"),
-            Map.entry("PHP", "php-8.5"),
-            Map.entry("RUBY", "ruby-4.0"),
-            Map.entry("HASKELL", "haskell-9.12"),
-            Map.entry("GO", "go-1.26"),
-            Map.entry("RUST", "rust-1.93"),
-            Map.entry("TYPESCRIPT", "typescript-deno")
+    private static final Map<String, Integer> JUDGE0_LANGUAGES = Map.ofEntries(
+            Map.entry("JAVA", 91),
+            Map.entry("PYTHON", 71),
+            Map.entry("C", 75),
+            Map.entry("CPP", 76),
+            Map.entry("CSHARP", 82),
+            Map.entry("FSHARP", 87),
+            Map.entry("PHP", 68),
+            Map.entry("RUBY", 72),
+            Map.entry("HASKELL", 61),
+            Map.entry("GO", 95),
+            Map.entry("RUST", 73),
+            Map.entry("TYPESCRIPT", 94)
     );
 
     private String wrapSourceCode(String language, String sourceCode) {
@@ -185,7 +186,9 @@ public class CodeExecutionService {
                 """;
 
         if (code.matches("(?s).*\\bclass\\s+\\w+.*")) {
-            return defaults + code;
+            // Replace "public class <name>" with "class <name>" to avoid filename mismatch compilation errors in Judge0
+            String processedCode = code.replaceAll("\\bpublic\\s+class\\s+", "class ");
+            return defaults + processedCode;
         }
 
         return defaults + """
@@ -385,16 +388,34 @@ public class CodeExecutionService {
         };
     }
 
-    private String compiler(String language) {
-        String compiler = COMPILERS.get(language);
+    private Integer judge0LanguageId(String language) {
+        Integer id = JUDGE0_LANGUAGES.get(language);
 
-        if (compiler == null) {
+        if (id == null) {
             throw new RuntimeException(
                     "Unsupported language. Supported languages: JAVA, PYTHON, C, CPP, CSHARP, FSHARP, PHP, RUBY, HASKELL, GO, RUST, TYPESCRIPT"
             );
         }
 
-        return compiler;
+        return id;
+    }
+
+    private String encodeBase64(String value) {
+        if (value == null) {
+            return "";
+        }
+        return Base64.getEncoder().encodeToString(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    private String decodeBase64(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        try {
+            return new String(Base64.getDecoder().decode(value.trim()), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            return value;
+        }
     }
 
     private String cleanBaseUrl(String value) {

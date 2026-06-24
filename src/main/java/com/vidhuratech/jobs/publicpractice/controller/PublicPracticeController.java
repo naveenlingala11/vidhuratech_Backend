@@ -82,6 +82,18 @@ public class PublicPracticeController {
                 .build();
     }
 
+    @PostMapping("/challenges/{id}/run-custom")
+    public ApiResponse<?> runChallengeCustom(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> payload
+    ) {
+        return ApiResponse.builder()
+                .success(true)
+                .message("Challenge custom run evaluated successfully")
+                .data(service.runPublicChallengeCustom(id, payload))
+                .build();
+    }
+
     @PostMapping("/access/register")
     public ApiResponse<?> registerAccess(
             @RequestBody Map<String, Object> payload

@@ -11,6 +11,8 @@ import com.vidhuratech.jobs.trainer.entity.AssessmentQuestion;
 import com.vidhuratech.jobs.trainer.repository.AssessmentAnswerRepository;
 import com.vidhuratech.jobs.trainer.repository.AssessmentAttemptRepository;
 import com.vidhuratech.jobs.trainer.repository.AssessmentRepository;
+import com.vidhuratech.jobs.user.repository.UserRepository;
+import com.vidhuratech.jobs.user.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,22 +30,44 @@ public class TrainerAssessmentService {
     private final SecurityUtils securityUtils;
     private final AssessmentAnswerRepository answerRepository;
     private final ActivityNotificationService notificationService;
+    private final UserRepository userRepository;
+
 
     @Transactional
     public Map<String, Object> createAssessment(
             Map<String, Object> payload
     ) {
         try {
-            Long batchId = Long.valueOf(String.valueOf(payload.get("batchId")));
+            Long batchId = payload.get("batchId") == null || String.valueOf(payload.get("batchId")).isBlank()
+                    ? 0L
+                    : Long.valueOf(String.valueOf(payload.get("batchId")));
 
             String email = securityUtils.getCurrentUserEmail();
+            Batch batch = null;
+            User trainerUser = null;
 
-            Batch batch = batchRepository
-                    .findByIdAndTrainerEmail(batchId, email)
-                    .orElseThrow(() ->
-                            new RuntimeException(
-                                    "Access denied. You can create assessments only for your assigned batches."
-                            ));
+            if (batchId != 0L) {
+                batch = batchRepository
+                        .findByIdAndTrainerEmail(batchId, email)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Access denied. You can create assessments only for your assigned batches."
+                                ));
+                trainerUser = batch.getTrainer();
+            } else {
+                trainerUser = userRepository.findByEmail(email)
+                        .orElseThrow(() -> new RuntimeException("Trainer user not found"));
+            }
+
+            boolean publicVisible = batchId == 0L || (payload.get("publicVisible") != null && Boolean.parseBoolean(String.valueOf(payload.get("publicVisible"))));
+
+            Object askedYearObj = payload.get("askedYear");
+            Integer askedYear = null;
+            if (askedYearObj != null && !String.valueOf(askedYearObj).isBlank()) {
+                try {
+                    askedYear = Integer.valueOf(String.valueOf(askedYearObj));
+                } catch (NumberFormatException ignored) {}
+            }
 
             Assessment assessment = Assessment.builder()
                     .title(String.valueOf(payload.get("title")))
@@ -57,13 +81,14 @@ public class TrainerAssessmentService {
                     .startTime(LocalDateTime.now())
                     .endTime(LocalDateTime.now().plusDays(30))
                     .batch(batch)
-                    .trainer(batch.getTrainer())
+                    .trainer(trainerUser)
                     .active(true)
                     .companyName(String.valueOf(payload.getOrDefault("companyName", "General")))
                     .skill(String.valueOf(payload.getOrDefault("skill", "Placement Readiness")))
-                    .publicVisible(false)
-                    .publicAccessLevel("LEAD_REQUIRED")
-                    .publicAttemptLimit(1)
+                    .askedYear(askedYear)
+                    .publicVisible(publicVisible)
+                    .publicAccessLevel(String.valueOf(payload.getOrDefault("publicAccessLevel", "LEAD_REQUIRED")))
+                    .publicAttemptLimit(payload.get("publicAttemptLimit") == null ? 1 : Integer.valueOf(String.valueOf(payload.get("publicAttemptLimit"))))
                     .build();
             notificationService.notifyAdmins(
                     "New assessment posted",
@@ -72,13 +97,15 @@ public class TrainerAssessmentService {
                     "/dashboard/admin/public-practice"
             );
 
-            notificationService.notifyBatchStudents(
-                    assessment.getBatch().getEnrollments(),
-                    "New assessment assigned",
-                    "New assessment added: " + assessment.getTitle(),
-                    "ASSESSMENT_ASSIGNED",
-                    "/dashboard/student/assessments"
-            );
+            if (assessment.getBatch() != null) {
+                notificationService.notifyBatchStudents(
+                        assessment.getBatch().getEnrollments(),
+                        "New assessment assigned",
+                        "New assessment added: " + assessment.getTitle(),
+                        "ASSESSMENT_ASSIGNED",
+                        "/dashboard/student/assessments"
+                );
+            }
             assessment = assessmentRepository.save(assessment);
 
             Object rawQuestions = payload.get("questions");
@@ -194,6 +221,7 @@ public class TrainerAssessmentService {
         map.put("createdAt", assessment.getStartTime());
         map.put("companyName", assessment.getCompanyName() == null ? "General" : assessment.getCompanyName());
         map.put("skill", assessment.getSkill() == null ? "Placement Readiness" : assessment.getSkill());
+        map.put("askedYear", assessment.getAskedYear());
         map.put("publicVisible", Boolean.TRUE.equals(assessment.getPublicVisible()));
         map.put("publicAccessLevel", assessment.getPublicAccessLevel());
         map.put("publicAttemptLimit", assessment.getPublicAttemptLimit());

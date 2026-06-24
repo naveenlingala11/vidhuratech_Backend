@@ -42,6 +42,28 @@ public interface AssessmentRepository extends JpaRepository<Assessment, Long> {
         LEFT JOIN FETCH a.questions
         LEFT JOIN FETCH a.batch b
         LEFT JOIN FETCH b.course
+        WHERE a.active = true
+        AND (
+            a.publicVisible = true
+            OR b IS NULL
+            OR (:hasBatches = true AND b.id IN :batchIds)
+        )
+        AND (a.startTime IS NULL OR a.startTime <= :now)
+        AND (a.endTime IS NULL OR a.endTime >= :now)
+        ORDER BY a.id DESC
+    """)
+    List<Assessment> findActiveAssessmentsForStudentAndPublic(
+            boolean hasBatches,
+            List<Long> batchIds,
+            LocalDateTime now
+    );
+
+    @Query("""
+        SELECT DISTINCT a
+        FROM Assessment a
+        LEFT JOIN FETCH a.questions
+        LEFT JOIN FETCH a.batch b
+        LEFT JOIN FETCH b.course
         LEFT JOIN FETCH a.trainer
         WHERE a.id = :id
     """)

@@ -359,6 +359,48 @@ public class PublicPracticeService {
     }
 
     @Transactional
+    public Map<String, Object> runPublicChallengeCustom(
+            Long challengeId,
+            Map<String, Object> payload
+    ) {
+        PublicPracticeAccessGrant grant = requireValidGrant(
+                String.valueOf(payload.getOrDefault("accessToken", "")),
+                "CHALLENGE",
+                challengeId
+        );
+        PseudoCodeChallenge challenge = challengeRepository.findById(challengeId)
+                .orElseThrow(() -> new RuntimeException("Challenge not found"));
+
+        if (!Boolean.TRUE.equals(challenge.getActive())) {
+            throw new RuntimeException("This challenge is not active");
+        }
+
+        String language = String.valueOf(payload.getOrDefault("language", "")).trim().toUpperCase();
+        String sourceCode = String.valueOf(payload.getOrDefault("sourceCode", ""));
+        String customInput = String.valueOf(payload.getOrDefault("customInput", ""));
+
+        if (!SUPPORTED_LANGUAGES.contains(language)) {
+            throw new RuntimeException("Unsupported language");
+        }
+
+        codeSecurityValidator.validate(language, sourceCode);
+
+        CodeExecutionService.ExecutionResult execution =
+                codeExecutionService.run(language, sourceCode, customInput);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("challengeId", challenge.getId());
+        response.put("customRun", true);
+        response.put("status", execution.isSuccess() ? "SUCCESS" : "FAIL");
+        response.put("inputData", customInput);
+        response.put("actualOutput", safe(execution.getOutput()));
+        response.put("errorMessage", safe(execution.getError()));
+        response.put("executionTimeMs", execution.getExecutionTimeMs());
+
+        return response;
+    }
+
+    @Transactional
     public Map<String, Object> runPublicChallenge(
             Long challengeId,
             Map<String, Object> payload

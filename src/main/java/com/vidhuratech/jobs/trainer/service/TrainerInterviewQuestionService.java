@@ -7,6 +7,8 @@ import com.vidhuratech.jobs.lms.batch.repository.BatchRepository;
 import com.vidhuratech.jobs.prep.entity.InterviewQuestion;
 import com.vidhuratech.jobs.prep.repository.InterviewQuestionRepository;
 import lombok.RequiredArgsConstructor;
+import com.vidhuratech.jobs.user.repository.UserRepository;
+import com.vidhuratech.jobs.user.entity.User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,27 +26,34 @@ public class TrainerInterviewQuestionService {
     private final BatchRepository batchRepository;
     private final SecurityUtils securityUtils;
     private final ActivityNotificationService notificationService;
+    private final UserRepository userRepository;
 
     @Transactional
     public Map<String, Object> create(Map<String, Object> payload) {
         String email = securityUtils.getCurrentUserEmail();
 
-        Long batchId = readLong(payload, "batchId", null);
-        if (batchId == null) {
-            throw new RuntimeException("Batch is required");
-        }
+        Long batchId = readLong(payload, "batchId", 0L);
+        Batch batch = null;
+        User trainerUser = null;
 
-        Batch batch = batchRepository.findByIdAndTrainerEmail(batchId, email)
-                .orElseThrow(() -> new RuntimeException("Access denied for selected batch"));
+        if (batchId != 0L) {
+            batch = batchRepository.findByIdAndTrainerEmail(batchId, email)
+                    .orElseThrow(() -> new RuntimeException("Access denied for selected batch"));
+            trainerUser = batch.getTrainer();
+        } else {
+            trainerUser = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("Trainer user not found"));
+        }
 
         InterviewQuestion q = new InterviewQuestion();
         applyPayload(q, payload);
 
         q.setBatchId(batchId);
-        q.setTrainer(batch.getTrainer());
+        q.setTrainer(trainerUser);
         q.setActive(true);
-        q.setPublicVisible(false);
-        q.setPublicAccessLevel("LEAD_REQUIRED");
+        boolean publicVisible = batchId == 0L || (payload.get("publicVisible") != null && Boolean.parseBoolean(String.valueOf(payload.get("publicVisible"))));
+        q.setPublicVisible(publicVisible);
+        q.setPublicAccessLevel(String.valueOf(payload.getOrDefault("publicAccessLevel", "LEAD_REQUIRED")));
         q.setCreatedAt(LocalDateTime.now());
 
         InterviewQuestion saved = repo.save(q);
@@ -56,7 +65,7 @@ public class TrainerInterviewQuestionService {
                 "/dashboard/admin/public-practice"
         );
 
-        if (batch.getEnrollments() != null) {
+        if (batch != null && batch.getEnrollments() != null) {
             notificationService.notifyBatchStudents(
                     batch.getEnrollments(),
                     "New interview question assigned",
@@ -85,24 +94,30 @@ public class TrainerInterviewQuestionService {
 
         for (Map<String, Object> item : payloads) {
             try {
-                Long batchId = readLong(item, "batchId", null);
-                if (batchId == null) {
-                    throw new RuntimeException("Batch is required");
-                }
+                Long batchId = readLong(item, "batchId", 0L);
+                Batch batch = null;
+                User trainerUser = null;
 
-                Batch batch = batchesById.computeIfAbsent(batchId, id ->
-                        batchRepository.findByIdAndTrainerEmail(id, email)
-                                .orElseThrow(() -> new RuntimeException("Access denied for selected batch"))
-                );
+                if (batchId != 0L) {
+                    batch = batchesById.computeIfAbsent(batchId, id ->
+                            batchRepository.findByIdAndTrainerEmail(id, email)
+                                    .orElseThrow(() -> new RuntimeException("Access denied for selected batch"))
+                    );
+                    trainerUser = batch.getTrainer();
+                } else {
+                    trainerUser = userRepository.findByEmail(email)
+                            .orElseThrow(() -> new RuntimeException("Trainer user not found"));
+                }
 
                 InterviewQuestion q = new InterviewQuestion();
                 applyPayload(q, item);
 
                 q.setBatchId(batchId);
-                q.setTrainer(batch.getTrainer());
+                q.setTrainer(trainerUser);
                 q.setActive(true);
-                q.setPublicVisible(false);
-                q.setPublicAccessLevel("LEAD_REQUIRED");
+                boolean publicVisible = batchId == 0L || (item.get("publicVisible") != null && Boolean.parseBoolean(String.valueOf(item.get("publicVisible"))));
+                q.setPublicVisible(publicVisible);
+                q.setPublicAccessLevel(String.valueOf(item.getOrDefault("publicAccessLevel", "LEAD_REQUIRED")));
                 q.setCreatedAt(LocalDateTime.now());
 
                 toSave.add(q);
@@ -131,7 +146,7 @@ public class TrainerInterviewQuestionService {
             );
 
             for (Batch batch : batchesById.values()) {
-                if (batch.getEnrollments() != null) {
+                if (batch != null && batch.getEnrollments() != null) {
                     notificationService.notifyBatchStudentsInAppOnly(
                             batch.getEnrollments(),
                             "New interview questions assigned",
@@ -165,19 +180,26 @@ public class TrainerInterviewQuestionService {
     public Map<String, Object> update(Long id, Map<String, Object> payload) {
         InterviewQuestion q = requireTrainerQuestion(id);
 
-        Long batchId = readLong(payload, "batchId", null);
-        if (batchId == null) {
-            throw new RuntimeException("Batch is required");
-        }
+        Long batchId = readLong(payload, "batchId", 0L);
+        Batch batch = null;
+        User trainerUser = null;
 
-        Batch batch = batchRepository.findByIdAndTrainerEmail(
-                batchId,
-                securityUtils.getCurrentUserEmail()
-        ).orElseThrow(() -> new RuntimeException("Access denied for batch"));
+        if (batchId != 0L) {
+            batch = batchRepository.findByIdAndTrainerEmail(
+                    batchId,
+                    securityUtils.getCurrentUserEmail()
+            ).orElseThrow(() -> new RuntimeException("Access denied for batch"));
+            trainerUser = batch.getTrainer();
+        } else {
+            trainerUser = userRepository.findByEmail(securityUtils.getCurrentUserEmail())
+                    .orElseThrow(() -> new RuntimeException("Trainer user not found"));
+        }
 
         applyPayload(q, payload);
         q.setBatchId(batchId);
-        q.setTrainer(batch.getTrainer());
+        q.setTrainer(trainerUser);
+        boolean publicVisible = batchId == 0L || (payload.get("publicVisible") != null && Boolean.parseBoolean(String.valueOf(payload.get("publicVisible"))));
+        q.setPublicVisible(publicVisible);
         q.setUpdatedAt(LocalDateTime.now());
 
         return map(repo.save(q));
@@ -202,6 +224,15 @@ public class TrainerInterviewQuestionService {
         q.setDifficulty(read(payload, "difficulty", "MEDIUM").toUpperCase());
         q.setQuestion(read(payload, "question", ""));
         q.setAnswer(read(payload, "answer", ""));
+
+        Object askedYearObj = payload.get("askedYear");
+        if (askedYearObj != null && !String.valueOf(askedYearObj).isBlank()) {
+            try {
+                q.setAskedYear(Integer.valueOf(String.valueOf(askedYearObj)));
+            } catch (NumberFormatException ignored) {}
+        } else {
+            q.setAskedYear(null);
+        }
 
         if (q.getQuestion().isBlank()) {
             throw new RuntimeException("Question is required");
@@ -270,6 +301,7 @@ public class TrainerInterviewQuestionService {
         map.put("type", safe(q.getType()));
         map.put("topic", safe(q.getTopic()));
         map.put("difficulty", safe(q.getDifficulty()));
+        map.put("askedYear", q.getAskedYear());
         map.put("question", safe(q.getQuestion()));
         map.put("title", safe(q.getQuestion()));
         map.put("answer", safe(q.getAnswer()));

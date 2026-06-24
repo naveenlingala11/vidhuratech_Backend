@@ -36,12 +36,14 @@ public class StudentInterviewQuestionService {
         User student = getCurrentUser();
 
         List<Long> batchIds = enrollmentRepository.findActiveBatchIdsByStudentId(student.getId());
-
-        if (batchIds == null || batchIds.isEmpty()) {
-            return Page.empty(PageRequest.of(page, 10));
+        if (batchIds == null) {
+            batchIds = java.util.Collections.emptyList();
         }
 
-        return repo.findStudentQuestions(
+        boolean hasBatches = !batchIds.isEmpty();
+
+        return repo.findStudentAndPublicQuestions(
+                hasBatches,
                 batchIds,
                 normalize(company),
                 normalize(role),
@@ -70,6 +72,7 @@ public class StudentInterviewQuestionService {
         map.put("type", safe(q.getType()));
         map.put("topic", safe(q.getTopic()));
         map.put("difficulty", safe(q.getDifficulty()));
+        map.put("askedYear", q.getAskedYear());
         map.put("question", safe(q.getQuestion()));
         map.put("answer", safe(q.getAnswer()));
         map.put("active", Boolean.TRUE.equals(q.getActive()));

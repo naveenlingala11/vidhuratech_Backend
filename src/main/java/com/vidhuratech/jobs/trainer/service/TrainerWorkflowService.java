@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 import com.vidhuratech.jobs.mentor.entity.MentorSession;
 import com.vidhuratech.jobs.mentor.repository.MentorSessionRepository;
+import com.vidhuratech.jobs.common.service.EmailService;
+import org.springframework.beans.factory.annotation.Value;
 
 @Service
 @RequiredArgsConstructor
@@ -41,7 +43,10 @@ public class TrainerWorkflowService {
     private final ActivityNotificationService notificationService;
     private final MentorSessionRepository mentorSessionRepository;
     private final MockInterviewJoinHistoryRepository joinHistoryRepository;
+    private final EmailService emailService;
 
+    @Value("${app.frontend-url:http://localhost:4200}")
+    private String frontendUrl;
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getStudents() {
@@ -66,7 +71,8 @@ public class TrainerWorkflowService {
             mentorSessionRepository.findAll().forEach(s -> list.add(mapMentorSessionToMock(s)));
         } else if (user.getRole() == UserRole.MENTOR) {
             mockRepository.findByTrainerEmailOrderByCreatedAtDesc(email).forEach(m -> list.add(mapMock(m)));
-            mentorSessionRepository.findAllByMentorIdWithStudent(user.getId()).forEach(s -> list.add(mapMentorSessionToMock(s)));
+            mentorSessionRepository.findAllByMentorIdWithStudent(user.getId())
+                    .forEach(s -> list.add(mapMentorSessionToMock(s)));
         } else {
             mockRepository.findByTrainerEmailOrderByCreatedAtDesc(email).forEach(m -> list.add(mapMock(m)));
         }
@@ -78,7 +84,8 @@ public class TrainerWorkflowService {
                 if (timeA != null && timeB != null) {
                     return timeB.compareTo(timeA);
                 }
-            } catch (Exception e) {}
+            } catch (Exception e) {
+            }
             return 0;
         });
 
@@ -107,16 +114,20 @@ public class TrainerWorkflowService {
                 session.setMeetingLink(payload.get("meetingLink") != null ? payload.get("meetingLink").toString() : "");
             }
             if (payload.containsKey("topic")) {
-                session.setSessionType(payload.get("topic") != null ? payload.get("topic").toString() : session.getSessionType());
+                session.setSessionType(
+                        payload.get("topic") != null ? payload.get("topic").toString() : session.getSessionType());
             }
             if (payload.containsKey("preferredDate")) {
-                session.setSessionDate(payload.get("preferredDate") != null ? payload.get("preferredDate").toString() : session.getSessionDate());
+                session.setSessionDate(payload.get("preferredDate") != null ? payload.get("preferredDate").toString()
+                        : session.getSessionDate());
             }
             if (payload.containsKey("preferredTime")) {
-                session.setSessionTime(payload.get("preferredTime") != null ? payload.get("preferredTime").toString() : session.getSessionTime());
+                session.setSessionTime(payload.get("preferredTime") != null ? payload.get("preferredTime").toString()
+                        : session.getSessionTime());
             }
             if (payload.containsKey("trainerEmail")) {
-                String tEmail = payload.get("trainerEmail") != null ? payload.get("trainerEmail").toString().trim() : "";
+                String tEmail = payload.get("trainerEmail") != null ? payload.get("trainerEmail").toString().trim()
+                        : "";
                 if (!tEmail.isEmpty()) {
                     userRepository.findByEmail(tEmail).ifPresent(session::setMentor);
                 }
@@ -155,10 +166,18 @@ public class TrainerWorkflowService {
             throw new RuntimeException("Invalid mock interview status");
         }
 
-        String meetingLink = payload.containsKey("meetingLink") ? (payload.get("meetingLink") != null ? payload.get("meetingLink").toString().trim() : "") : (request.getMeetingLink() != null ? request.getMeetingLink() : "");
-        String remarks = payload.containsKey("trainerRemarks") ? (payload.get("trainerRemarks") != null ? payload.get("trainerRemarks").toString().trim() : "") : (request.getTrainerRemarks() != null ? request.getTrainerRemarks() : "");
-        String summary = payload.containsKey("sessionSummary") ? (payload.get("sessionSummary") != null ? payload.get("sessionSummary").toString() : null) : request.getSessionSummary();
-        String chat = payload.containsKey("sessionChat") ? (payload.get("sessionChat") != null ? payload.get("sessionChat").toString() : null) : request.getSessionChat();
+        String meetingLink = payload.containsKey("meetingLink")
+                ? (payload.get("meetingLink") != null ? payload.get("meetingLink").toString().trim() : "")
+                : (request.getMeetingLink() != null ? request.getMeetingLink() : "");
+        String remarks = payload.containsKey("trainerRemarks")
+                ? (payload.get("trainerRemarks") != null ? payload.get("trainerRemarks").toString().trim() : "")
+                : (request.getTrainerRemarks() != null ? request.getTrainerRemarks() : "");
+        String summary = payload.containsKey("sessionSummary")
+                ? (payload.get("sessionSummary") != null ? payload.get("sessionSummary").toString() : null)
+                : request.getSessionSummary();
+        String chat = payload.containsKey("sessionChat")
+                ? (payload.get("sessionChat") != null ? payload.get("sessionChat").toString() : null)
+                : request.getSessionChat();
 
         if (status == MockInterviewStatus.SCHEDULED && meetingLink.isBlank()) {
             throw new RuntimeException("Meeting link is required to schedule interview");
@@ -182,9 +201,8 @@ public class TrainerWorkflowService {
             request.setCandidateEmail(cEmail);
             if (!cEmail.isEmpty()) {
                 userRepository.findByEmail(cEmail).ifPresentOrElse(
-                    request::setStudent,
-                    () -> request.setStudent(null)
-                );
+                        request::setStudent,
+                        () -> request.setStudent(null));
             } else {
                 request.setStudent(null);
             }
@@ -197,9 +215,8 @@ public class TrainerWorkflowService {
             request.setHostEmail(tEmail);
             if (!tEmail.isEmpty()) {
                 userRepository.findByEmail(tEmail).ifPresentOrElse(
-                    request::setTrainer,
-                    () -> request.setTrainer(null)
-                );
+                        request::setTrainer,
+                        () -> request.setTrainer(null));
             } else {
                 request.setTrainer(null);
             }
@@ -213,16 +230,22 @@ public class TrainerWorkflowService {
             request.setIsPublic(Boolean.valueOf(payload.get("isPublic").toString()));
         }
         if (payload.containsKey("maxDurationMinutes")) {
-            request.setMaxDurationMinutes(payload.get("maxDurationMinutes") != null ? Integer.valueOf(payload.get("maxDurationMinutes").toString()) : null);
+            request.setMaxDurationMinutes(payload.get("maxDurationMinutes") != null
+                    ? Integer.valueOf(payload.get("maxDurationMinutes").toString())
+                    : null);
         }
         if (payload.containsKey("actualDurationMinutes")) {
-            request.setActualDurationMinutes(payload.get("actualDurationMinutes") != null ? Integer.valueOf(payload.get("actualDurationMinutes").toString()) : null);
+            request.setActualDurationMinutes(payload.get("actualDurationMinutes") != null
+                    ? Integer.valueOf(payload.get("actualDurationMinutes").toString())
+                    : null);
         }
         if (payload.containsKey("isEnded")) {
             request.setIsEnded(Boolean.valueOf(payload.get("isEnded").toString()));
         }
         if (payload.containsKey("participantCount")) {
-            request.setParticipantCount(payload.get("participantCount") != null ? Integer.valueOf(payload.get("participantCount").toString()) : null);
+            request.setParticipantCount(payload.get("participantCount") != null
+                    ? Integer.valueOf(payload.get("participantCount").toString())
+                    : null);
         }
         if (payload.containsKey("meetingLogs")) {
             request.setMeetingLogs(payload.get("meetingLogs") != null ? payload.get("meetingLogs").toString() : null);
@@ -235,8 +258,7 @@ public class TrainerWorkflowService {
                 "Mock interview " + saved.getStatus(),
                 "Your mock interview status changed to " + saved.getStatus(),
                 "MOCK_INTERVIEW_UPDATED",
-                "/dashboard/student/mock-interviews"
-        );
+                "/dashboard/student/mock-interviews");
 
         return mapMock(saved);
     }
@@ -267,15 +289,13 @@ public class TrainerWorkflowService {
                 "New " + saved.getType(),
                 saved.getTitle() + " assigned for " + batch.getName(),
                 "WORK_ITEM_CREATED",
-                "/dashboard/student/assignments"
-        );
+                "/dashboard/student/assignments");
 
         notificationService.notifyAdmins(
                 "Trainer assigned work",
                 saved.getTitle() + " assigned for batch " + batch.getName(),
                 "WORK_ITEM_CREATED",
-                "/dashboard/admin/batches"
-        );
+                "/dashboard/admin/batches");
 
         return mapWorkItem(saved);
     }
@@ -315,8 +335,7 @@ public class TrainerWorkflowService {
                 "Submission reviewed",
                 "Your submission was reviewed: " + saved.getWorkItem().getTitle(),
                 "SUBMISSION_REVIEWED",
-                "/dashboard/student/assignments"
-        );
+                "/dashboard/student/assignments");
 
         return mapSubmission(saved);
     }
@@ -341,7 +360,8 @@ public class TrainerWorkflowService {
     }
 
     private LocalDateTime parseDateTimeSafe(String str) {
-        if (str == null || str.isBlank()) return null;
+        if (str == null || str.isBlank())
+            return null;
         try {
             if (str.contains("Z") || str.contains("+") || (str.lastIndexOf("-") > 7)) {
                 return java.time.OffsetDateTime.parse(str).toLocalDateTime();
@@ -360,8 +380,16 @@ public class TrainerWorkflowService {
         Map<String, Object> map = new HashMap<>();
 
         map.put("id", request.getId());
-        map.put("student", request.getStudent() != null ? request.getStudent().getName() : (request.getCandidateName() != null && !request.getCandidateName().isEmpty() ? request.getCandidateName() : "Guest Candidate"));
-        map.put("email", request.getStudent() != null ? request.getStudent().getEmail() : (request.getCandidateEmail() != null && !request.getCandidateEmail().isEmpty() ? request.getCandidateEmail() : "Guest Email"));
+        map.put("student",
+                request.getStudent() != null ? request.getStudent().getName()
+                        : (request.getCandidateName() != null && !request.getCandidateName().isEmpty()
+                                ? request.getCandidateName()
+                                : "Guest Candidate"));
+        map.put("email",
+                request.getStudent() != null ? request.getStudent().getEmail()
+                        : (request.getCandidateEmail() != null && !request.getCandidateEmail().isEmpty()
+                                ? request.getCandidateEmail()
+                                : "Guest Email"));
         map.put("batch", request.getBatch() == null ? "Batch" : request.getBatch().getName());
         map.put("batchId", request.getBatch() == null ? null : request.getBatch().getId());
         map.put("topic", request.getTopic() == null ? "Mock Interview" : request.getTopic());
@@ -377,7 +405,8 @@ public class TrainerWorkflowService {
         map.put("updatedAt", request.getUpdatedAt());
         map.put("expirationDate", request.getExpirationDate());
         map.put("maxDurationMinutes", request.getMaxDurationMinutes() == null ? 60 : request.getMaxDurationMinutes());
-        map.put("actualDurationMinutes", request.getActualDurationMinutes() == null ? 0 : request.getActualDurationMinutes());
+        map.put("actualDurationMinutes",
+                request.getActualDurationMinutes() == null ? 0 : request.getActualDurationMinutes());
         map.put("isEnded", Boolean.TRUE.equals(request.getIsEnded()));
         map.put("participantCount", request.getParticipantCount() == null ? 0 : request.getParticipantCount());
         map.put("meetingLogs", request.getMeetingLogs() == null ? "" : request.getMeetingLogs());
@@ -387,7 +416,8 @@ public class TrainerWorkflowService {
         map.put("recurringType", request.getRecurringType() == null ? "ONCE" : request.getRecurringType());
         map.put("recurringDays", request.getRecurringDays() == null ? "" : request.getRecurringDays());
         map.put("invitedEmails", request.getInvitedEmails() == null ? "" : request.getInvitedEmails());
-        map.put("preferredEndTime", request.getPreferredEndTime() == null ? "" : request.getPreferredEndTime().toString());
+        map.put("preferredEndTime",
+                request.getPreferredEndTime() == null ? "" : request.getPreferredEndTime().toString());
         map.put("timezone", request.getTimezone() == null ? "Asia/Kolkata" : request.getTimezone());
 
         java.util.List<Map<String, Object>> historyList = new java.util.ArrayList<>();
@@ -413,8 +443,10 @@ public class TrainerWorkflowService {
         }
         map.put("hostRole", hRole);
 
-        String resolvedTrainerEmail = request.getTrainer() != null ? request.getTrainer().getEmail() : (request.getHostEmail() != null ? request.getHostEmail() : "");
-        String resolvedTrainerName = request.getTrainer() != null ? request.getTrainer().getName() : (request.getHostName() != null ? request.getHostName() : "Guest Host");
+        String resolvedTrainerEmail = request.getTrainer() != null ? request.getTrainer().getEmail()
+                : (request.getHostEmail() != null ? request.getHostEmail() : "");
+        String resolvedTrainerName = request.getTrainer() != null ? request.getTrainer().getName()
+                : (request.getHostName() != null ? request.getHostName() : "Guest Host");
         map.put("trainerEmail", resolvedTrainerEmail);
         map.put("trainerName", resolvedTrainerName);
 
@@ -433,7 +465,7 @@ public class TrainerWorkflowService {
         map.put("preferredDate", session.getSessionDate() != null ? session.getSessionDate() : "");
         map.put("preferredTime", session.getSessionTime() != null ? session.getSessionTime() : "");
         map.put("notes", "Mentor Session scheduled via roster booking.");
-        
+
         String status = session.getStatus();
         map.put("status", status != null ? status : "SCHEDULED");
         map.put("meetingLink", session.getMeetingLink() != null ? session.getMeetingLink() : "");
@@ -486,8 +518,7 @@ public class TrainerWorkflowService {
                 "title", item.getTitle(),
                 "description", item.getDescription(),
                 "dueAt", item.getDueAt(),
-                "totalMarks", item.getTotalMarks()
-        );
+                "totalMarks", item.getTotalMarks());
     }
 
     private Map<String, Object> mapSubmission(TrainingSubmission submission) {
@@ -516,7 +547,7 @@ public class TrainerWorkflowService {
         String hostName = payload.getOrDefault("hostName", "").toString().trim();
         String candidateEmail = payload.getOrDefault("candidateEmail", "").toString().trim();
         String candidateName = payload.getOrDefault("candidateName", "").toString().trim();
-        
+
         Integer duration = 60;
         if (payload.containsKey("maxDurationMinutes") && payload.get("maxDurationMinutes") != null) {
             try {
@@ -547,20 +578,26 @@ public class TrainerWorkflowService {
         String hostRole = payload.getOrDefault("hostRole", "GUEST").toString().trim().toUpperCase();
         request.setHostRole(hostRole);
 
-        if (payload.containsKey("preferredDate") && payload.get("preferredDate") != null && !payload.get("preferredDate").toString().isBlank()) {
+        if (payload.containsKey("preferredDate") && payload.get("preferredDate") != null
+                && !payload.get("preferredDate").toString().isBlank()) {
             try {
                 request.setPreferredDate(LocalDate.parse(payload.get("preferredDate").toString()));
-            } catch (Exception e) {}
+            } catch (Exception e) {
+            }
         }
-        if (payload.containsKey("preferredTime") && payload.get("preferredTime") != null && !payload.get("preferredTime").toString().isBlank()) {
+        if (payload.containsKey("preferredTime") && payload.get("preferredTime") != null
+                && !payload.get("preferredTime").toString().isBlank()) {
             try {
                 request.setPreferredTime(LocalTime.parse(payload.get("preferredTime").toString()));
-            } catch (Exception e) {}
+            } catch (Exception e) {
+            }
         }
-        if (payload.containsKey("preferredEndTime") && payload.get("preferredEndTime") != null && !payload.get("preferredEndTime").toString().isBlank()) {
+        if (payload.containsKey("preferredEndTime") && payload.get("preferredEndTime") != null
+                && !payload.get("preferredEndTime").toString().isBlank()) {
             try {
                 request.setPreferredEndTime(LocalTime.parse(payload.get("preferredEndTime").toString()));
-            } catch (Exception e) {}
+            } catch (Exception e) {
+            }
         }
         if (payload.containsKey("recurringType") && payload.get("recurringType") != null) {
             request.setRecurringType(payload.get("recurringType").toString().trim().toUpperCase());
@@ -588,6 +625,19 @@ public class TrainerWorkflowService {
         request.setCandidateEmail(candidateEmail);
 
         MockInterviewRequest saved = mockRepository.save(request);
+
+        // Send Email Invitations to all invitedEmails asynchronously
+        String invitedEmailsStr = saved.getInvitedEmails();
+        if (invitedEmailsStr != null && !invitedEmailsStr.isBlank()) {
+            String[] emails = invitedEmailsStr.split(",");
+            for (String email : emails) {
+                String trimmedEmail = email.trim();
+                if (!trimmedEmail.isEmpty()) {
+                    sendInvitationEmail(saved, trimmedEmail);
+                }
+            }
+        }
+
         return mapMock(saved);
     }
 
@@ -607,22 +657,31 @@ public class TrainerWorkflowService {
             request.setSessionChat(payload.get("sessionChat") != null ? payload.get("sessionChat").toString() : null);
         }
         if (payload.containsKey("sessionSummary")) {
-            request.setSessionSummary(payload.get("sessionSummary") != null ? payload.get("sessionSummary").toString() : null);
+            request.setSessionSummary(
+                    payload.get("sessionSummary") != null ? payload.get("sessionSummary").toString() : null);
         }
         if (payload.containsKey("isEnded")) {
             request.setIsEnded(Boolean.valueOf(payload.get("isEnded").toString()));
         }
         if (payload.containsKey("actualDurationMinutes")) {
-            request.setActualDurationMinutes(payload.get("actualDurationMinutes") != null ? Integer.valueOf(payload.get("actualDurationMinutes").toString()) : null);
+            request.setActualDurationMinutes(payload.get("actualDurationMinutes") != null
+                    ? Integer.valueOf(payload.get("actualDurationMinutes").toString())
+                    : null);
         }
         if (payload.containsKey("participantCount")) {
-            request.setParticipantCount(payload.get("participantCount") != null ? Integer.valueOf(payload.get("participantCount").toString()) : null);
+            request.setParticipantCount(payload.get("participantCount") != null
+                    ? Integer.valueOf(payload.get("participantCount").toString())
+                    : null);
         }
         if (payload.containsKey("meetingLogs")) {
             request.setMeetingLogs(payload.get("meetingLogs") != null ? payload.get("meetingLogs").toString() : null);
         }
         if (payload.containsKey("trainerRemarks")) {
-            request.setTrainerRemarks(payload.get("trainerRemarks") != null ? payload.get("trainerRemarks").toString() : null);
+            request.setTrainerRemarks(
+                    payload.get("trainerRemarks") != null ? payload.get("trainerRemarks").toString() : null);
+        }
+        if (payload.containsKey("meetingLink")) {
+            request.setMeetingLink(payload.get("meetingLink") != null ? payload.get("meetingLink").toString() : null);
         }
 
         request.setUpdatedAt(LocalDateTime.now());
@@ -634,7 +693,7 @@ public class TrainerWorkflowService {
     public void logMeetingJoin(Long sessionId, String name, String email, String role) {
         MockInterviewRequest request = mockRepository.findById(sessionId)
                 .orElseThrow(() -> new RuntimeException("Mock interview request not found"));
-        
+
         Integer currentCount = request.getJoinCount();
         request.setJoinCount(currentCount == null ? 1 : currentCount + 1);
         mockRepository.save(request);
@@ -646,5 +705,181 @@ public class TrainerWorkflowService {
         join.setJoinedByRole(role);
         join.setJoinedAt(LocalDateTime.now());
         joinHistoryRepository.save(join);
+    }
+
+    private void sendInvitationEmail(MockInterviewRequest request, String toEmail) {
+        try {
+            String hostName = request.getHostName();
+            if (hostName == null || hostName.isBlank()) {
+                hostName = "Creator";
+            }
+            String hostEmail = request.getHostEmail();
+            if (hostEmail == null || hostEmail.isBlank()) {
+                hostEmail = "support@vidhuratech.com";
+            }
+            String topic = request.getTopic();
+            if (topic == null || topic.isBlank()) {
+                topic = "Live Connect Session";
+            }
+
+            String dateStr = request.getPreferredDate() != null ? request.getPreferredDate().toString()
+                    : java.time.LocalDate.now().toString();
+            String timeStr = request.getPreferredTime() != null ? request.getPreferredTime().toString()
+                    : java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"));
+            String durationStr = request.getMaxDurationMinutes() != null && request.getMaxDurationMinutes() > 0
+                    ? request.getMaxDurationMinutes() + " Mins"
+                    : "Unlimited (Premium License)";
+            String timezoneStr = request.getTimezone() != null ? request.getTimezone() : "Asia/Kolkata";
+
+            String joinUrl = frontendUrl;
+            if (joinUrl == null) {
+                joinUrl = "http://localhost:4200";
+            }
+            if (!joinUrl.endsWith("/")) {
+                joinUrl += "/";
+            }
+            joinUrl += "meeting/VT_session_" + request.getId();
+
+            String subject = "VidhuraTech Invite: " + topic;
+
+            String htmlBody = "<!DOCTYPE html>\n" +
+                    "<html>\n" +
+                    "<head>\n" +
+                    "  <meta charset=\"utf-8\">\n" +
+                    "  <title>VidhuraTech Meeting Invitation</title>\n" +
+                    "</head>\n" +
+                    "<body style=\"margin: 0; padding: 0; background-color: #f3f6fc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;\">\n"
+                    +
+                    "  <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"background-color: #f3f6fc; padding: 40px 0;\">\n"
+                    +
+                    "    <tr>\n" +
+                    "      <td align=\"center\">\n" +
+                    "        <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"600\" style=\"background-color: #ffffff; border-radius: 16px; border: 1px solid rgba(79, 70, 229, 0.08); box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.04), 0 8px 10px -6px rgba(15, 23, 42, 0.02); overflow: hidden;\">\n"
+                    +
+                    "          \n" +
+                    "          <!-- Branded Top Header Banner -->\n" +
+                    "          <tr>\n" +
+                    "            <td style=\"background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); padding: 32px 40px; text-align: left;\">\n"
+                    +
+                    "              <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\">\n" +
+                    "                <tr>\n" +
+                    "                  <td>\n" +
+                    "                    <span style=\"font-size: 24px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px;\">Vidhura<span style=\"color: #c7d2fe;\">Tech</span></span>\n"
+                    +
+                    "                    <span style=\"font-size: 14px; font-weight: 500; color: #c7d2fe; margin-left: 8px; border-left: 1px solid rgba(255,255,255,0.3); padding-left: 8px;\">LiveConnect</span>\n"
+                    +
+                    "                  </td>\n" +
+                    "                </tr>\n" +
+                    "              </table>\n" +
+                    "            </td>\n" +
+                    "          </tr>\n" +
+                    "          \n" +
+                    "          <!-- Body Content Area -->\n" +
+                    "          <tr>\n" +
+                    "            <td style=\"padding: 40px;\">\n" +
+                    "              <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\">\n" +
+                    "                <tr>\n" +
+                    "                  <td style=\"font-size: 18px; font-weight: 700; color: #0f172a; padding-bottom: 16px;\">\n"
+                    +
+                    "                    Hello Candidate,\n" +
+                    "                  </td>\n" +
+                    "                </tr>\n" +
+                    "                <tr>\n" +
+                    "                  <td style=\"font-size: 15px; line-height: 24px; color: #475569; padding-bottom: 24px;\">\n"
+                    +
+                    "                    You have been invited to participate in a collaborative workspace on VidhuraTech, hosted by <strong>"
+                    + hostName + "</strong>.\n" +
+                    "                  </td>\n" +
+                    "                </tr>\n" +
+                    "                \n" +
+                    "                <!-- Meeting Details Table Card -->\n" +
+                    "                <tr>\n" +
+                    "                  <td style=\"background-color: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; padding: 24px; margin-bottom: 24px;\">\n"
+                    +
+                    "                    <table border=\"0\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\">\n" +
+                    "                      <tr>\n" +
+                    "                        <td style=\"padding-bottom: 12px; font-size: 14px; color: #64748b; width: 140px; font-weight: 500; vertical-align: top;\">\n"
+                    +
+                    "                          Assessment:\n" +
+                    "                        </td>\n" +
+                    "                        <td style=\"padding-bottom: 12px; font-size: 14px; color: #0f172a; font-weight: 600; vertical-align: top;\">\n"
+                    +
+                    "                          " + topic + "\n" +
+                    "                        </td>\n" +
+                    "                      </tr>\n" +
+                    "                      <tr>\n" +
+                    "                        <td style=\"padding-bottom: 12px; font-size: 14px; color: #64748b; vertical-align: top;\">\n"
+                    +
+                    "                          Scheduled Date:\n" +
+                    "                        </td>\n" +
+                    "                        <td style=\"padding-bottom: 12px; font-size: 14px; color: #0f172a; font-weight: 600; vertical-align: top;\">"
+                    + dateStr + " at " + timeStr + " (" + timezoneStr + ")</td>\n" +
+                    "                      </tr>\n" +
+                    "                      <tr>\n" +
+                    "                        <td style=\"padding-bottom: 12px; font-size: 14px; color: #64748b; vertical-align: top;\">\n"
+                    +
+                    "                          Call Limit:\n" +
+                    "                        </td>\n" +
+                    "                        <td style=\"padding-bottom: 12px; font-size: 14px; color: #0f172a; font-weight: 600; vertical-align: top;\">\n"
+                    +
+                    "                          " + durationStr + "\n" +
+                    "                        </td>\n" +
+                    "                      </tr>\n" +
+                    "                      <tr>\n" +
+                    "                        <td style=\"font-size: 14px; color: #64748b; vertical-align: top;\">\n" +
+                    "                          Connection:\n" +
+                    "                        </td>\n" +
+                    "                        <td style=\"font-size: 14px; color: #0f172a; font-weight: 600; vertical-align: top;\">\n"
+                    +
+                    "                          Fully secure WebRTC (P2P) Room\n" +
+                    "                        </td>\n" +
+                    "                      </tr>\n" +
+                    "                    </table>\n" +
+                    "                  </td>\n" +
+                    "                </tr>\n" +
+                    "                \n" +
+                    "                <tr>\n" +
+                    "                  <td style=\"padding: 16px 0;\"></td>\n" +
+                    "                </tr>\n" +
+                    "                \n" +
+                    "                <!-- CTA Button -->\n" +
+                    "                <tr>\n" +
+                    "                  <td align=\"center\">\n" +
+                    "                    <a href=\"" + joinUrl
+                    + "\" target=\"_blank\" style=\"display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; border-radius: 8px; box-shadow: 0 4px 10px rgba(79, 70, 229, 0.2); text-align: center;\">\n"
+                    +
+                    "                      Join Collaboration Workspace\n" +
+                    "                    </a>\n" +
+                    "                  </td>\n" +
+                    "                </tr>\n" +
+                    "                \n" +
+                    "                <tr>\n" +
+                    "                  <td style=\"padding: 16px 0;\"></td>\n" +
+                    "                </tr>\n" +
+                    "                \n" +
+                    "                <!-- Footer Note -->\n" +
+                    "                <tr>\n" +
+                    "                  <td style=\"font-size: 13px; line-height: 20px; color: #64748b; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 24px;\">\n"
+                    +
+                    "                    All connections are established directly. Video/audio streams run browser-locally.\n"
+                    +
+                    "                  </td>\n" +
+                    "                </tr>\n" +
+                    "              </table>\n" +
+                    "            </td>\n" +
+                    "          </tr>\n" +
+                    "          \n" +
+                    "        </table>\n" +
+                    "      </td>\n" +
+                    "    </tr>\n" +
+                    "  </table>\n" +
+                    "</body>\n" +
+                    "</html>";
+
+            emailService.sendMeetingInvitation(toEmail, subject, htmlBody, hostEmail, hostName);
+        } catch (Exception e) {
+            org.slf4j.LoggerFactory.getLogger(TrainerWorkflowService.class)
+                    .error("Failed to compile/send meeting invite email to {}", toEmail, e);
+        }
     }
 }
