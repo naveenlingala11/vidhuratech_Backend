@@ -501,6 +501,35 @@ public class JobSeederService {
         }
     }
 
+    @Transactional
+    public Map<String, Object> cleanSeededJobs() {
+        Map<String, Object> result = new LinkedHashMap<>();
+        try {
+            System.out.println("🧹 PURGING SEEDED DUMMY JOBS...");
+            
+            // 1. Delete matching entries in job_skills join table first
+            int deletedSkillsCount = entityManager.createNativeQuery(
+                "DELETE FROM job_skills WHERE job_id IN (SELECT id FROM jobs WHERE apply_link LIKE '%ref=vidhuratech_seed_%')"
+            ).executeUpdate();
+            
+            // 2. Delete matching jobs from jobs table
+            int deletedJobsCount = entityManager.createNativeQuery(
+                "DELETE FROM jobs WHERE apply_link LIKE '%ref=vidhuratech_seed_%'"
+            ).executeUpdate();
+            
+            result.put("success", true);
+            result.put("deletedJobsCount", deletedJobsCount);
+            result.put("deletedSkillsAssociationsCount", deletedSkillsCount);
+            result.put("message", "Successfully purged " + deletedJobsCount + " seeded dummy jobs.");
+            System.out.println("✅ PURGED " + deletedJobsCount + " SEEDED DUMMY JOBS SUCCESSFULLY.");
+        } catch (Exception e) {
+            result.put("success", false);
+            result.put("error", e.getMessage());
+            System.err.println("❌ FAILED TO PURGE SEEDED JOBS: " + e.getMessage());
+        }
+        return result;
+    }
+
     private void saveBatch(List<Job> jobs) {
         for (Job job : jobs) {
             entityManager.persist(job);

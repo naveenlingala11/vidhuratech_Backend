@@ -101,6 +101,15 @@ public class MockInterviewRequest {
     @Builder.Default
     private String timezone = "Asia/Kolkata";
 
+    private Integer feedbackRating;
+
+    @Column(columnDefinition = "TEXT")
+    private String feedbackText;
+
+    private String feedbackUser;
+
+    private String feedbackEmail;
+
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 
