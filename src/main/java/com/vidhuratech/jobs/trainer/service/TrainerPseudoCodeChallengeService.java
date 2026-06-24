@@ -36,10 +36,14 @@ public class TrainerPseudoCodeChallengeService {
     ) {
         String email = securityUtils.getCurrentUserEmail();
 
-        Long batchId = Long.valueOf(String.valueOf(payload.get("batchId")));
+        Long batchId = payload.get("batchId") == null || String.valueOf(payload.get("batchId")).isBlank()
+                ? 0L
+                : Long.valueOf(String.valueOf(payload.get("batchId")));
 
-        batchRepository.findByIdAndTrainerEmail(batchId, email)
-                .orElseThrow(() -> new RuntimeException("Access denied"));
+        if (batchId != 0L) {
+            batchRepository.findByIdAndTrainerEmail(batchId, email)
+                    .orElseThrow(() -> new RuntimeException("Access denied"));
+        }
 
         String title = String.valueOf(payload.get("title"));
 
@@ -54,6 +58,14 @@ public class TrainerPseudoCodeChallengeService {
         String companyName = forcedCompanyName != null
                 ? forcedCompanyName
                 : String.valueOf(payload.getOrDefault("companyName", ""));
+
+        Object askedYearObj = payload.get("askedYear");
+        Integer askedYear = null;
+        if (askedYearObj != null && !String.valueOf(askedYearObj).isBlank()) {
+            try {
+                askedYear = Integer.valueOf(String.valueOf(askedYearObj));
+            } catch (NumberFormatException ignored) {}
+        }
 
         PseudoCodeChallenge challenge = PseudoCodeChallenge.builder()
                 .batchId(batchId)
@@ -72,9 +84,10 @@ public class TrainerPseudoCodeChallengeService {
                 .challengeGroupTitle(groupTitle)
                 .companyName(companyName)
                 .skill(String.valueOf(payload.getOrDefault("skill", "Coding")))
-                .publicVisible(false)
-                .publicAccessLevel("LEAD_REQUIRED")
-                .publicAttemptLimit(1)
+                .askedYear(askedYear)
+                .publicVisible(batchId == 0L || (payload.get("publicVisible") != null && Boolean.parseBoolean(String.valueOf(payload.get("publicVisible")))))
+                .publicAccessLevel(String.valueOf(payload.getOrDefault("publicAccessLevel", "LEAD_REQUIRED")))
+                .publicAttemptLimit(payload.get("publicAttemptLimit") == null ? 1 : Integer.valueOf(String.valueOf(payload.get("publicAttemptLimit"))))
                 .hintText(String.valueOf(payload.getOrDefault("hintText", "")))
                 .constraintsImageUrl(getString(payload, "constraintsImageUrl", ""))
                 .inputFormatImageUrl(getString(payload, "inputFormatImageUrl", ""))
@@ -153,12 +166,18 @@ public class TrainerPseudoCodeChallengeService {
             throw new RuntimeException("Access denied");
         }
 
-        Long batchId = Long.valueOf(String.valueOf(payload.get("batchId")));
+        Long batchId = payload.get("batchId") == null || String.valueOf(payload.get("batchId")).isBlank()
+                ? 0L
+                : Long.valueOf(String.valueOf(payload.get("batchId")));
 
-        batchRepository.findByIdAndTrainerEmail(batchId, email)
-                .orElseThrow(() -> new RuntimeException("Access denied for batch"));
+        if (batchId != 0L) {
+            batchRepository.findByIdAndTrainerEmail(batchId, email)
+                    .orElseThrow(() -> new RuntimeException("Access denied for batch"));
+        }
 
         challenge.setBatchId(batchId);
+        boolean publicVisible = batchId == 0L || (payload.get("publicVisible") != null && Boolean.parseBoolean(String.valueOf(payload.get("publicVisible"))));
+        challenge.setPublicVisible(publicVisible);
         challenge.setTitle(String.valueOf(payload.get("title")));
         challenge.setProblemStatement(String.valueOf(payload.get("problemStatement")));
         challenge.setConstraintsText(
@@ -192,6 +211,15 @@ public class TrainerPseudoCodeChallengeService {
          challenge.setSkill(
                  String.valueOf(payload.getOrDefault("skill", challenge.getSkill()))
          );
+
+         Object askedYearObj = payload.get("askedYear");
+         if (askedYearObj != null && !String.valueOf(askedYearObj).isBlank()) {
+             try {
+                 challenge.setAskedYear(Integer.valueOf(String.valueOf(askedYearObj)));
+             } catch (NumberFormatException ignored) {}
+         } else {
+             challenge.setAskedYear(null);
+         }
 
          challenge.setHintText(
                  String.valueOf(payload.getOrDefault("hintText", ""))
@@ -410,6 +438,7 @@ public class TrainerPseudoCodeChallengeService {
         map.put("challengeGroupTitle", challenge.getChallengeGroupTitle() == null ? challenge.getTitle() : challenge.getChallengeGroupTitle());
         map.put("companyName", challenge.getCompanyName() == null ? "" : challenge.getCompanyName());
         map.put("skill", challenge.getSkill() == null ? "Coding" : challenge.getSkill());
+        map.put("askedYear", challenge.getAskedYear());
         map.put("publicVisible", Boolean.TRUE.equals(challenge.getPublicVisible()));
         map.put("publicAccessLevel", challenge.getPublicAccessLevel());
         map.put("publicAttemptLimit", challenge.getPublicAttemptLimit());

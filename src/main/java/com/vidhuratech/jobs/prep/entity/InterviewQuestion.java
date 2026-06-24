@@ -21,6 +21,7 @@ public class InterviewQuestion {
     private String type;
     private String topic;
     private String difficulty;
+    private Integer askedYear;
 
     @Column(columnDefinition = "TEXT")
     private String question;

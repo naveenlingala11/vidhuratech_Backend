@@ -88,6 +88,37 @@ public interface InterviewQuestionRepository extends JpaRepository<InterviewQues
         SELECT q
         FROM InterviewQuestion q
         LEFT JOIN FETCH q.trainer
+        WHERE q.active = true
+        AND (
+            q.publicVisible = true 
+            OR q.batchId IS NULL 
+            OR q.batchId = 0 
+            OR (:hasBatches = true AND q.batchId IN :batchIds)
+        )
+        AND (:company = '' OR LOWER(q.company) = :company)
+        AND (:role = '' OR LOWER(q.role) = :role)
+        AND (:search = '' OR LOWER(q.question) LIKE CONCAT('%', :search, '%'))
+        AND (:type = '' OR q.type = :type)
+        AND (:difficulty = '' OR q.difficulty = :difficulty)
+        AND (:topic = '' OR LOWER(q.topic) = :topic)
+        ORDER BY q.createdAt DESC, q.id DESC
+    """)
+    Page<InterviewQuestion> findStudentAndPublicQuestions(
+            @Param("hasBatches") boolean hasBatches,
+            @Param("batchIds") List<Long> batchIds,
+            @Param("company") String company,
+            @Param("role") String role,
+            @Param("search") String search,
+            @Param("type") String type,
+            @Param("difficulty") String difficulty,
+            @Param("topic") String topic,
+            Pageable pageable
+    );
+
+    @Query("""
+        SELECT q
+        FROM InterviewQuestion q
+        LEFT JOIN FETCH q.trainer
         ORDER BY q.createdAt DESC, q.id DESC
     """)
     List<InterviewQuestion> findAllPublicCandidates();

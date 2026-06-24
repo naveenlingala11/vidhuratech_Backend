@@ -13,6 +13,24 @@ public interface PseudoCodeChallengeRepository extends JpaRepository<PseudoCodeC
 
     List<PseudoCodeChallenge> findByBatchIdInAndActiveTrueOrderByCreatedAtDesc(List<Long> batchIds);
 
+    @Query("""
+        SELECT DISTINCT c
+        FROM PseudoCodeChallenge c
+        LEFT JOIN FETCH c.testCases
+        WHERE c.active = true
+        AND (
+            c.publicVisible = true
+            OR c.batchId IS NULL
+            OR c.batchId = 0
+            OR (:hasBatches = true AND c.batchId IN :batchIds)
+        )
+        ORDER BY c.createdAt DESC, c.id DESC
+    """)
+    List<PseudoCodeChallenge> findActiveChallengesForStudentAndPublic(
+            boolean hasBatches,
+            List<Long> batchIds
+    );
+
     long countByBatchIdInAndActiveTrue(List<Long> batchIds);
 
     List<PseudoCodeChallenge> findByActiveTrueOrderByCreatedAtDesc();

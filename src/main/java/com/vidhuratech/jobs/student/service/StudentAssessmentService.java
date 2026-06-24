@@ -64,13 +64,11 @@ public class StudentAssessmentService {
                         )
                         .toList();
 
-        if (batchIds.isEmpty()) {
-
-            return new ArrayList<>();
-        }
+        boolean hasBatches = !batchIds.isEmpty();
 
         return assessmentRepository
-                .findActiveAssessmentsForStudent(
+                .findActiveAssessmentsForStudentAndPublic(
+                        hasBatches,
                         batchIds,
                         LocalDateTime.now()
                 )
@@ -103,6 +101,21 @@ public class StudentAssessmentService {
         map.put(
                 "id",
                 assessment.getId()
+        );
+
+        map.put(
+                "companyName",
+                assessment.getCompanyName()
+        );
+
+        map.put(
+                "skill",
+                assessment.getSkill()
+        );
+
+        map.put(
+                "askedYear",
+                assessment.getAskedYear()
         );
 
         map.put(
@@ -362,6 +375,21 @@ public class StudentAssessmentService {
         );
 
         map.put(
+                "companyName",
+                assessment.getCompanyName()
+        );
+
+        map.put(
+                "skill",
+                assessment.getSkill()
+        );
+
+        map.put(
+                "askedYear",
+                assessment.getAskedYear()
+        );
+
+        map.put(
                 "description",
                 assessment.getDescription()
         );
@@ -430,8 +458,8 @@ public class StudentAssessmentService {
             User student,
             Assessment assessment
     ) {
-        if (assessment.getBatch() == null) {
-            throw new RuntimeException("Access denied");
+        if (assessment.getBatch() == null || Boolean.TRUE.equals(assessment.getPublicVisible())) {
+            return;
         }
 
         boolean enrolled =

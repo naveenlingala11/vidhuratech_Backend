@@ -53,6 +53,7 @@ public class PseudoCodeChallenge {
     private String challengeGroupTitle;
     private String companyName;
     private String skill;
+    private Integer askedYear;
 
     @Builder.Default
     private String difficultyLevel = "MEDIUM";

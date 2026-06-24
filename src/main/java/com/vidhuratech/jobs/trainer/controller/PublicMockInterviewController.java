@@ -66,7 +66,11 @@ public class PublicMockInterviewController {
         }
 
         Long mockId = null;
-        if (roomName.startsWith("VidhuraTech_Mock_Session_")) {
+        if (roomName.startsWith("VT_session_")) {
+            try {
+                mockId = Long.valueOf(roomName.substring("VT_session_".length()));
+            } catch (Exception e) {}
+        } else if (roomName.startsWith("VidhuraTech_Mock_Session_")) {
             try {
                 mockId = Long.valueOf(roomName.substring("VidhuraTech_Mock_Session_".length()));
             } catch (Exception e) {}

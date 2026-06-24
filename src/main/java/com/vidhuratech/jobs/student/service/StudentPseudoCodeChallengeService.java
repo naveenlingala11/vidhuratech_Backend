@@ -40,11 +40,9 @@ public class StudentPseudoCodeChallengeService {
                 .map(Batch::getId)
                 .toList();
 
-        if (batchIds.isEmpty()) {
-            return new ArrayList<>();
-        }
+        boolean hasBatches = !batchIds.isEmpty();
 
-        return challengeRepository.findByBatchIdInAndActiveTrueOrderByCreatedAtDesc(batchIds)
+        return challengeRepository.findActiveChallengesForStudentAndPublic(hasBatches, batchIds)
                 .stream()
                 .map(challenge -> mapChallengeForStudent(challenge, student))
                 .toList();
@@ -168,7 +166,14 @@ public class StudentPseudoCodeChallengeService {
             }
         }
 
-        for (PseudoCodeTestCase testCase : challenge.getTestCases()) {
+        for (int i = 0; i < challenge.getTestCases().size(); i++) {
+            PseudoCodeTestCase testCase = challenge.getTestCases().get(i);
+
+            // Small delay between submissions to avoid RapidAPI rate limiting (429)
+            if (i > 0) {
+                try { Thread.sleep(500); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+            }
+
             CodeExecutionService.ExecutionResult execution =
                     codeExecutionService.run(language, sourceCode, testCase.getInputData());
 
@@ -271,7 +276,14 @@ public class StudentPseudoCodeChallengeService {
         int score = 0;
         String compileError = "";
 
-        for (PseudoCodeTestCase testCase : challenge.getTestCases()) {
+        for (int i = 0; i < challenge.getTestCases().size(); i++) {
+            PseudoCodeTestCase testCase = challenge.getTestCases().get(i);
+
+            // Small delay between submissions to avoid RapidAPI rate limiting (429)
+            if (i > 0) {
+                try { Thread.sleep(500); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+            }
+
             CodeExecutionService.ExecutionResult execution =
                     codeExecutionService.run(language, sourceCode, testCase.getInputData());
 
@@ -349,8 +361,11 @@ public class StudentPseudoCodeChallengeService {
         return userRepository.findByEmail(securityUtils.getCurrentUserEmail())
                 .orElseThrow(() -> new RuntimeException("Student not found"));
     }
-
     private void verifyStudentHasAccess(User student, Long batchId) {
+        if (batchId == null || batchId == 0) {
+            return;
+        }
+
         boolean enrolled = batchEnrollmentRepository.findActiveByStudentEmail(student.getEmail())
                 .stream()
                 .anyMatch(enrollment -> enrollment.getBatch().getId().equals(batchId));
@@ -408,6 +423,7 @@ public class StudentPseudoCodeChallengeService {
         map.put("challengeGroupId", challenge.getChallengeGroupId() == null ? "LEGACY-" + challenge.getId() : challenge.getChallengeGroupId());
         map.put("challengeGroupTitle", challenge.getChallengeGroupTitle() == null ? challenge.getTitle() : challenge.getChallengeGroupTitle());
         map.put("companyName",challenge.getCompanyName() == null ? "" : challenge.getCompanyName());
+        map.put("askedYear", challenge.getAskedYear());
 
         return map;
     }

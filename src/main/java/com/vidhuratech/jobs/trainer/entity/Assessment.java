@@ -54,6 +54,7 @@ public class Assessment {
 
     private String companyName;
     private String skill;
+    private Integer askedYear;
 
     @Builder.Default
     private Boolean publicVisible = false;

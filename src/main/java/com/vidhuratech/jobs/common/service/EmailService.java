@@ -40,6 +40,42 @@ public class EmailService {
     }
 
     @Async
+    public void sendMeetingInvitation(
+            String to,
+            String subject,
+            String htmlContent,
+            String hostEmail,
+            String hostName) {
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+
+            MimeMessageHelper helper =
+                    new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setText(htmlContent, true);
+            
+            if (hostName != null && !hostName.isBlank()) {
+                helper.setFrom("support@vidhuratech.com", hostName + " via VidhuraTech");
+            } else {
+                helper.setFrom("support@vidhuratech.com", "VidhuraTech");
+            }
+            
+            if (hostEmail != null && !hostEmail.isBlank()) {
+                helper.setReplyTo(hostEmail);
+            }
+
+            mailSender.send(message);
+            log.info("Meeting invitation sent successfully to {}", to);
+
+        } catch (Exception e) {
+            log.error("Failed to send meeting invitation email to {}", to, e);
+        }
+    }
+
+    @Async
     public void sendHtmlEmailWithAttachment(
             String to,
             String subject,
