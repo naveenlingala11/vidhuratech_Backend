@@ -438,32 +438,43 @@ public class JobService {
         );
     }
 
+    private Pageable ensureSorting(Pageable pageable) {
+        if (pageable.getSort().isUnsorted()) {
+            return PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                Sort.by(Sort.Direction.DESC, "postedAt")
+            );
+        }
+        return pageable;
+    }
+
     // ─────────────────────────────────────────────────────────
     // QUERIES
     // ─────────────────────────────────────────────────────────
     @Transactional(readOnly = true)
     public PageResponse<JobResponse> getAllJobs(Pageable pageable) {
-        return mapPage(jobRepo.findAll(pageable));
+        return mapPage(jobRepo.findAll(ensureSorting(pageable)));
     }
 
     @Transactional(readOnly = true)
     public PageResponse<JobResponse> getByCategory(String category, Pageable pageable) {
-        return mapPage(jobRepo.findByCategoryIgnoreCase(category, pageable));
+        return mapPage(jobRepo.findByCategoryIgnoreCase(category, ensureSorting(pageable)));
     }
 
     @Transactional(readOnly = true)
     public PageResponse<JobResponse> getByLocation(String location, Pageable pageable) {
-        return mapPage(jobRepo.findByLocationContainingIgnoreCase(location, pageable));
+        return mapPage(jobRepo.findByLocationContainingIgnoreCase(location, ensureSorting(pageable)));
     }
 
     @Transactional(readOnly = true)
     public PageResponse<JobResponse> getByType(String type, Pageable pageable) {
-        return mapPage(jobRepo.findByJobTypeIgnoreCase(type, pageable));
+        return mapPage(jobRepo.findByJobTypeIgnoreCase(type, ensureSorting(pageable)));
     }
 
     @Transactional(readOnly = true)
     public PageResponse<JobResponse> searchJobs(String keyword, Pageable pageable) {
-        return mapPage(jobRepo.findByTitleContainingIgnoreCase(keyword, pageable));
+        return mapPage(jobRepo.findByTitleContainingIgnoreCase(keyword, ensureSorting(pageable)));
     }
 
     // ─────────────────────────────────────────────────────────

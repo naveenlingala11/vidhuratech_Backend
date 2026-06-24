@@ -24,13 +24,16 @@ public class JobController {
     private final JobService service;
     private final ScraperService scraperService;
     private final JobSeederService seederService;
+    private final com.vidhuratech.jobs.jobs.service.AdzunaScraperService adzunaService;
 
     public JobController(JobService service,
                          ScraperService scraperService,
-                         JobSeederService seederService) {
+                         JobSeederService seederService,
+                         com.vidhuratech.jobs.jobs.service.AdzunaScraperService adzunaService) {
         this.service = service;
         this.scraperService = scraperService;
         this.seederService = seederService;
+        this.adzunaService = adzunaService;
     }
 
     // ✅ FIX: Missing @GetMapping
@@ -130,5 +133,31 @@ public class JobController {
         progress.put("isSeeding", JobSeederService.isSeeding);
         progress.put("currentProgress", JobSeederService.currentSeedProgress);
         return ResponseEntity.ok(progress);
+    }
+
+    @DeleteMapping("/seed/clean")
+    public ResponseEntity<Map<String, Object>> cleanSeededJobs() {
+        Map<String, Object> result = seederService.cleanSeededJobs();
+        if (Boolean.TRUE.equals(result.get("success"))) {
+            return ResponseEntity.ok(result);
+        } else {
+            return ResponseEntity.internalServerError().body(result);
+        }
+    }
+
+    @GetMapping("/scrape/adzuna")
+    public ResponseEntity<Map<String, Object>> scrapeAdzuna(
+            @RequestParam(defaultValue = "Software Developer") String what,
+            @RequestParam(defaultValue = "3") int pages) {
+        Map<String, Object> result = adzunaService.scrapeAdzunaJobs(what, pages);
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/scrape/adzuna/status")
+    public ResponseEntity<Map<String, Object>> getAdzunaStatus() {
+        Map<String, Object> status = new java.util.HashMap<>();
+        status.put("configured", adzunaService.isConfigured());
+        status.put("appId", adzunaService.getAppId() != null && !adzunaService.getAppId().equals("dummy_id") ? adzunaService.getAppId() : null);
+        return ResponseEntity.ok(status);
     }
 }

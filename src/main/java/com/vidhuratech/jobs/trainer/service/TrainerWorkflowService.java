@@ -419,6 +419,10 @@ public class TrainerWorkflowService {
         map.put("preferredEndTime",
                 request.getPreferredEndTime() == null ? "" : request.getPreferredEndTime().toString());
         map.put("timezone", request.getTimezone() == null ? "Asia/Kolkata" : request.getTimezone());
+        map.put("feedbackRating", request.getFeedbackRating() == null ? 0 : request.getFeedbackRating());
+        map.put("feedbackText", request.getFeedbackText() == null ? "" : request.getFeedbackText());
+        map.put("feedbackUser", request.getFeedbackUser() == null ? "" : request.getFeedbackUser());
+        map.put("feedbackEmail", request.getFeedbackEmail() == null ? "" : request.getFeedbackEmail());
 
         java.util.List<Map<String, Object>> historyList = new java.util.ArrayList<>();
         if (request.getId() != null) {
@@ -682,6 +686,20 @@ public class TrainerWorkflowService {
         }
         if (payload.containsKey("meetingLink")) {
             request.setMeetingLink(payload.get("meetingLink") != null ? payload.get("meetingLink").toString() : null);
+        }
+        if (payload.containsKey("feedbackRating")) {
+            request.setFeedbackRating(payload.get("feedbackRating") != null
+                    ? Integer.valueOf(payload.get("feedbackRating").toString())
+                    : null);
+        }
+        if (payload.containsKey("feedbackText")) {
+            request.setFeedbackText(payload.get("feedbackText") != null ? payload.get("feedbackText").toString() : null);
+        }
+        if (payload.containsKey("feedbackUser")) {
+            request.setFeedbackUser(payload.get("feedbackUser") != null ? payload.get("feedbackUser").toString() : null);
+        }
+        if (payload.containsKey("feedbackEmail")) {
+            request.setFeedbackEmail(payload.get("feedbackEmail") != null ? payload.get("feedbackEmail").toString() : null);
         }
 
         request.setUpdatedAt(LocalDateTime.now());
