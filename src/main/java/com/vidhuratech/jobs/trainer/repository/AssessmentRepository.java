@@ -84,6 +84,17 @@ public interface AssessmentRepository extends JpaRepository<Assessment, Long> {
     List<Assessment> findActivePublicAssessments(LocalDateTime now);
 
     @Query("""
+    SELECT a
+    FROM Assessment a
+    WHERE a.active = true
+    AND a.publicVisible = true
+    AND (a.startTime IS NULL OR a.startTime <= :now)
+    AND (a.endTime IS NULL OR a.endTime >= :now)
+    ORDER BY a.publishedAt DESC, a.id DESC
+""")
+    List<Assessment> findActivePublicAssessmentsLight(LocalDateTime now);
+
+    @Query("""
     SELECT DISTINCT a
     FROM Assessment a
     LEFT JOIN FETCH a.questions

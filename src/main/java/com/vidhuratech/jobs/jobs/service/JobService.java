@@ -259,24 +259,10 @@ public class JobService {
     public void cleanNonIndiaJobs() {
         System.out.println("🧹 STARTING CLEANUP OF NON-INDIA JOBS...");
         try {
-            List<Job> allJobs = jobRepo.findAll();
-            List<Job> toDelete = new ArrayList<>();
-            for (Job job : allJobs) {
-                if (job.getLocation() == null || !isIndiaLocation(job.getLocation(), job.getCompanyString())) {
-                    toDelete.add(job);
-                }
-            }
-            if (!toDelete.isEmpty()) {
-                int totalToDelete = toDelete.size();
-                int batchSize = 100;
-                for (int i = 0; i < totalToDelete; i += batchSize) {
-                    List<Job> batch = toDelete.subList(i, Math.min(i + batchSize, totalToDelete));
-                    jobRepo.deleteAllInBatch(batch);
-                }
-                System.out.println("🗑️ DELETED " + totalToDelete + " NON-INDIA JOBS.");
-            } else {
-                System.out.println("✅ NO NON-INDIA JOBS TO DELETE.");
-            }
+            int skillsDeleted = jobRepo.deleteJobSkillsForNonIndiaJobs();
+            System.out.println("🔗 Removed " + skillsDeleted + " job_skills references.");
+            int deleted = jobRepo.deleteNonIndiaJobs();
+            System.out.println("🗑️ DELETED " + deleted + " NON-INDIA JOBS (SQL-level cleanup).");
         } catch (Exception e) {
             System.err.println("❌ ERROR CLEANING NON-INDIA JOBS: " + e.getMessage());
             e.printStackTrace();
