@@ -61,4 +61,6 @@ public interface PseudoCodeChallengeRepository extends JpaRepository<PseudoCodeC
     WHERE c.id = :id
 """)
     Optional<PseudoCodeChallenge> findPublicPracticeCandidateById(Long id);
+
+    List<PseudoCodeChallenge> findByChallengeGroupId(String challengeGroupId);
 }

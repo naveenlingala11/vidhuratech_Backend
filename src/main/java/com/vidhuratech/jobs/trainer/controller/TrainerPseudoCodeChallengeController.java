@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/trainer/pseudo-challenges")
+@RequestMapping({"/api/trainer/pseudo-challenges", "/api/trainer/challenges"})
 @RequiredArgsConstructor
 public class TrainerPseudoCodeChallengeController {
 
@@ -91,6 +91,19 @@ public class TrainerPseudoCodeChallengeController {
                 .success(true)
                 .message("Bulk challenges created successfully")
                 .data(service.createBulkChallenges(payload))
+                .build();
+    }
+
+    @PutMapping("/groups/{groupId}")
+    @PreAuthorize("hasRole('TRAINER')")
+    public ApiResponse<?> updateGroup(
+            @PathVariable String groupId,
+            @RequestBody Map<String, Object> payload
+    ) {
+        return ApiResponse.builder()
+                .success(true)
+                .message("Group updated successfully")
+                .data(service.updateChallengeGroup(groupId, payload))
                 .build();
     }
 }

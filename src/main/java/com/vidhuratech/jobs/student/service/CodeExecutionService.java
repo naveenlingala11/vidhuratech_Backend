@@ -43,6 +43,11 @@ public class CodeExecutionService {
             body.put("source_code", base64Code);
             body.put("language_id", langId);
             body.put("stdin", base64Input);
+            // Strict resource and network constraints for sandboxing (LeetCode-style security)
+            body.put("cpu_time_limit", 2.0);
+            body.put("memory_limit", 131072);
+            body.put("max_processes_and_threads", 30);
+            body.put("enable_network", false);
 
             String url = cleanBaseUrl(baseUrl) + "/submissions?wait=true&base64_encoded=true";
 
