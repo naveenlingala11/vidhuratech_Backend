@@ -19,17 +19,143 @@ public class GeminiService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${gemini.api-key:}")
-    private String apiKey;
+    private String geminiApiKey;
+
+    @Value("${gemini.model:gemini-2.5-flash}")
+    private String geminiModel;
+
+    @Value("${groq.api-key:}")
+    private String groqApiKey;
+
+    @Value("${groq.model:llama-3.3-70b-specdec}")
+    private String groqModel;
+
+    @Value("${deepseek.api-key:}")
+    private String deepseekApiKey;
+
+    @Value("${deepseek.model:deepseek-chat}")
+    private String deepseekModel;
+
+    @Value("${openrouter.api-key:}")
+    private String openrouterApiKey;
+
+    @Value("${openrouter.model:meta-llama/llama-3-8b-instruct:free}")
+    private String openrouterModel;
+
+    @Value("${ai.active-provider:GEMINI}")
+    private String activeProvider;
+
+    // Getters and Setters for runtime customization
+    public String getGeminiApiKey() {
+        return geminiApiKey;
+    }
+
+    public void setGeminiApiKey(String geminiApiKey) {
+        this.geminiApiKey = geminiApiKey;
+    }
+
+    public String getGeminiModel() {
+        return geminiModel;
+    }
+
+    public void setGeminiModel(String geminiModel) {
+        this.geminiModel = geminiModel;
+    }
+
+    public String getGroqApiKey() {
+        return groqApiKey;
+    }
+
+    public void setGroqApiKey(String groqApiKey) {
+        this.groqApiKey = groqApiKey;
+    }
+
+    public String getGroqModel() {
+        return groqModel;
+    }
+
+    public void setGroqModel(String groqModel) {
+        this.groqModel = groqModel;
+    }
+
+    public String getDeepseekApiKey() {
+        return deepseekApiKey;
+    }
+
+    public void setDeepseekApiKey(String deepseekApiKey) {
+        this.deepseekApiKey = deepseekApiKey;
+    }
+
+    public String getDeepseekModel() {
+        return deepseekModel;
+    }
+
+    public void setDeepseekModel(String deepseekModel) {
+        this.deepseekModel = deepseekModel;
+    }
+
+    public String getOpenrouterApiKey() {
+        return openrouterApiKey;
+    }
+
+    public void setOpenrouterApiKey(String openrouterApiKey) {
+        this.openrouterApiKey = openrouterApiKey;
+    }
+
+    public String getOpenrouterModel() {
+        return openrouterModel;
+    }
+
+    public void setOpenrouterModel(String openrouterModel) {
+        this.openrouterModel = openrouterModel;
+    }
+
+    public String getActiveProvider() {
+        return activeProvider;
+    }
+
+    public void setActiveProvider(String activeProvider) {
+        this.activeProvider = activeProvider;
+    }
+
+    private boolean isValidApiKey(String apiKey) {
+        return apiKey != null && !apiKey.isBlank() 
+                && !apiKey.startsWith("YOUR_") 
+                && !apiKey.contains("PLACEHOLDER");
+    }
+
+    public boolean isGeminiConfigured() {
+        return isValidApiKey(geminiApiKey);
+    }
+
+    public boolean isGroqConfigured() {
+        return isValidApiKey(groqApiKey);
+    }
+
+    public boolean isDeepseekConfigured() {
+        return isValidApiKey(deepseekApiKey);
+    }
+
+    public boolean isOpenrouterConfigured() {
+        return isValidApiKey(openrouterApiKey);
+    }
 
     public boolean isConfigured() {
-        return apiKey != null && !apiKey.isBlank() && !apiKey.equals("YOUR_GEMINI_API_KEY_HERE");
+        if ("GROQ".equalsIgnoreCase(activeProvider)) {
+            return isGroqConfigured();
+        } else if ("DEEPSEEK".equalsIgnoreCase(activeProvider)) {
+            return isDeepseekConfigured();
+        } else if ("OPENROUTER".equalsIgnoreCase(activeProvider)) {
+            return isOpenrouterConfigured();
+        } else {
+            return isGeminiConfigured();
+        }
     }
 
     public String getReview(String problemTitle, String problemDescription, String code, String language) {
         if (!isConfigured()) {
-            return "### ⚠️ Gemini API Key not configured\n" +
-                   "Please follow the **Gemini API Key Guide** to obtain an API key from Google AI Studio, " +
-                   "then configure `gemini.api-key` in `application-dev.properties` to unlock real-time code assessments.";
+            return "### ⚠️ AI Service (" + activeProvider + ") not configured\n" +
+                   "Please verify your API key settings for " + activeProvider + " in the admin console.";
         }
 
         String systemInstruction = "You are an expert AI coding companion and code reviewer for the Vidhura Tech platform.\n" +
@@ -49,42 +175,20 @@ public class GeminiService {
                 problemTitle, problemDescription, language, language.toLowerCase(), code
         );
 
-        try {
-            // Package the request payload according to the Gemini API JSON structure
-            Map<String, Object> parts = Map.of("text", userPrompt + "\n\nSystem Instructions:\n" + systemInstruction);
-            Map<String, Object> contents = Map.of("parts", List.of(parts));
-            Map<String, Object> requestBody = Map.of("contents", List.of(contents));
-            String requestBodyJson = objectMapper.writeValueAsString(requestBody);
-
-            String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey;
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(requestBodyJson))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() != 200) {
-                return "❌ Gemini API error (Status Code: " + response.statusCode() + "): " + response.body();
-            }
-
-            JsonNode rootNode = objectMapper.readTree(response.body());
-            JsonNode textNode = rootNode.path("candidates").get(0)
-                    .path("content").path("parts").get(0).path("text");
-
-            return textNode.asText("No review response generated by Gemini.");
-
-        } catch (Exception e) {
-            return "❌ Error communicating with Gemini API: " + e.getMessage();
+        if ("GROQ".equalsIgnoreCase(activeProvider)) {
+            return callGroq(systemInstruction, userPrompt);
+        } else if ("DEEPSEEK".equalsIgnoreCase(activeProvider)) {
+            return callDeepSeek(systemInstruction, userPrompt);
+        } else if ("OPENROUTER".equalsIgnoreCase(activeProvider)) {
+            return callOpenRouter(systemInstruction, userPrompt);
+        } else {
+            return callGemini(systemInstruction, userPrompt);
         }
     }
 
     public String getAiHints(String problemTitle, String problemDescription, String constraints, String inputFormat, String outputFormat) {
         if (!isConfigured()) {
-            return "### ⚠️ Gemini API Key not configured\n" +
-                   "Please follow the **Gemini API Key Guide** to configure `gemini.api-key`.";
+            return "Error generating hints: AI Service (" + activeProvider + ") not configured.";
         }
 
         String systemInstruction = "You are an expert AI coding tutor.\n" +
@@ -109,13 +213,25 @@ public class GeminiService {
                 problemTitle, problemDescription, constraints, inputFormat, outputFormat
         );
 
+        if ("GROQ".equalsIgnoreCase(activeProvider)) {
+            return callGroq(systemInstruction, userPrompt);
+        } else if ("DEEPSEEK".equalsIgnoreCase(activeProvider)) {
+            return callDeepSeek(systemInstruction, userPrompt);
+        } else if ("OPENROUTER".equalsIgnoreCase(activeProvider)) {
+            return callOpenRouter(systemInstruction, userPrompt);
+        } else {
+            return callGemini(systemInstruction, userPrompt);
+        }
+    }
+
+    private String callGemini(String systemInstruction, String userPrompt) {
         try {
             Map<String, Object> parts = Map.of("text", userPrompt + "\n\nSystem Instructions:\n" + systemInstruction);
             Map<String, Object> contents = Map.of("parts", List.of(parts));
             Map<String, Object> requestBody = Map.of("contents", List.of(contents));
             String requestBodyJson = objectMapper.writeValueAsString(requestBody);
 
-            String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey;
+            String url = "https://generativelanguage.googleapis.com/v1beta/models/" + geminiModel + ":generateContent?key=" + geminiApiKey;
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
@@ -126,17 +242,68 @@ public class GeminiService {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() != 200) {
-                return "Error generating hints: Gemini API error (" + response.statusCode() + ")";
+                return "❌ Gemini API error (Status Code: " + response.statusCode() + "): " + response.body();
             }
 
             JsonNode rootNode = objectMapper.readTree(response.body());
             JsonNode textNode = rootNode.path("candidates").get(0)
                     .path("content").path("parts").get(0).path("text");
 
-            return textNode.asText("No hints response generated.");
+            return textNode.asText("No response generated by Gemini.");
 
         } catch (Exception e) {
-            return "Error generating hints: " + e.getMessage();
+            return "❌ Error communicating with Gemini API: " + e.getMessage();
         }
+    }
+
+    private String callOpenAiCompatible(String url, String apiKey, String model, String systemInstruction, String userPrompt, Map<String, String> extraHeaders) {
+        try {
+            Map<String, String> systemMessage = Map.of("role", "system", "content", systemInstruction);
+            Map<String, String> userMessage = Map.of("role", "user", "content", userPrompt);
+            Map<String, Object> requestBody = Map.of(
+                    "model", model,
+                    "messages", List.of(systemMessage, userMessage),
+                    "temperature", 0.2
+            );
+            String requestBodyJson = objectMapper.writeValueAsString(requestBody);
+
+            var builder = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "Bearer " + apiKey)
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBodyJson));
+
+            if (extraHeaders != null) {
+                extraHeaders.forEach(builder::header);
+            }
+
+            HttpRequest request = builder.build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                return "❌ API error (Status Code: " + response.statusCode() + "): " + response.body();
+            }
+
+            JsonNode rootNode = objectMapper.readTree(response.body());
+            JsonNode textNode = rootNode.path("choices").get(0)
+                    .path("message").path("content");
+
+            return textNode.asText("No response generated.");
+        } catch (Exception e) {
+            return "❌ Error communicating with API: " + e.getMessage();
+        }
+    }
+
+    private String callGroq(String systemInstruction, String userPrompt) {
+        return callOpenAiCompatible("https://api.groq.com/openai/v1/chat/completions", groqApiKey, groqModel, systemInstruction, userPrompt, null);
+    }
+
+    private String callDeepSeek(String systemInstruction, String userPrompt) {
+        return callOpenAiCompatible("https://api.deepseek.com/chat/completions", deepseekApiKey, deepseekModel, systemInstruction, userPrompt, null);
+    }
+
+    private String callOpenRouter(String systemInstruction, String userPrompt) {
+        return callOpenAiCompatible("https://openrouter.ai/api/v1/chat/completions", openrouterApiKey, openrouterModel, systemInstruction, userPrompt, 
+            Map.of("HTTP-Referer", "https://vidhuratech.com", "X-Title", "Vidhura Tech"));
     }
 }
