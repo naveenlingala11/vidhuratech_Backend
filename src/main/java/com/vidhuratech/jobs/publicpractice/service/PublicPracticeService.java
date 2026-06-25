@@ -3,6 +3,7 @@ package com.vidhuratech.jobs.publicpractice.service;
 import com.vidhuratech.jobs.common.exception.PracticeAccessRequiredException;
 import com.vidhuratech.jobs.common.notification.service.ActivityNotificationService;
 import com.vidhuratech.jobs.common.security.SecurityUtils;
+import com.vidhuratech.jobs.common.service.GeminiService;
 import com.vidhuratech.jobs.leads.entity.Lead;
 import com.vidhuratech.jobs.leads.repository.LeadRepository;
 import com.vidhuratech.jobs.leads.service.LeadService;
@@ -68,6 +69,7 @@ public class PublicPracticeService {
     private final PlanAccessService planAccessService;
     private final ObjectMapper objectMapper;
     private final SecurityUtils securityUtils;
+    private final GeminiService geminiService;
 
     @Transactional(readOnly = true)
     public Map<String, Object> getPracticeLibrary() {
@@ -1854,5 +1856,54 @@ public class PublicPracticeService {
         lead.setDeleted(false);
 
         return leadRepository.save(lead);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> reviewPublicChallenge(Long challengeId, String code, String language, String accessToken) {
+        requireValidGrant(accessToken, "CHALLENGE", challengeId);
+
+        PseudoCodeChallenge challenge = challengeRepository.findById(challengeId)
+                .orElseThrow(() -> new RuntimeException("Challenge not found"));
+
+        if (!Boolean.TRUE.equals(challenge.getActive())) {
+            throw new RuntimeException("This challenge is not active");
+        }
+
+        String reviewMarkdown = geminiService.getReview(
+                challenge.getTitle(),
+                challenge.getProblemStatement(),
+                code,
+                language
+        );
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("challengeId", challengeId);
+        response.put("review", reviewMarkdown);
+        return response;
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getPublicChallengeAiHints(Long challengeId, String accessToken) {
+        requireValidGrant(accessToken, "CHALLENGE", challengeId);
+
+        PseudoCodeChallenge challenge = challengeRepository.findById(challengeId)
+                .orElseThrow(() -> new RuntimeException("Challenge not found"));
+
+        if (!Boolean.TRUE.equals(challenge.getActive())) {
+            throw new RuntimeException("This challenge is not active");
+        }
+
+        String hintsText = geminiService.getAiHints(
+                challenge.getTitle(),
+                challenge.getProblemStatement(),
+                challenge.getConstraintsText(),
+                challenge.getInputFormat(),
+                challenge.getOutputFormat()
+        );
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("challengeId", challengeId);
+        response.put("hints", hintsText);
+        return response;
     }
 }

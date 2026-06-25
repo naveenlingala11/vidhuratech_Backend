@@ -67,6 +67,15 @@ public class TrainerPseudoCodeChallengeService {
             } catch (NumberFormatException ignored) {}
         }
 
+        String difficulty = "MEDIUM";
+        Object diffObj = payload.get("difficulty");
+        if (diffObj == null) {
+            diffObj = payload.get("difficultyLevel");
+        }
+        if (diffObj != null && !String.valueOf(diffObj).isBlank()) {
+            difficulty = String.valueOf(diffObj).trim().toUpperCase(Locale.ROOT);
+        }
+
         PseudoCodeChallenge challenge = PseudoCodeChallenge.builder()
                 .batchId(batchId)
                 .title(title)
@@ -85,6 +94,7 @@ public class TrainerPseudoCodeChallengeService {
                 .companyName(companyName)
                 .skill(String.valueOf(payload.getOrDefault("skill", "Coding")))
                 .askedYear(askedYear)
+                .difficultyLevel(difficulty)
                 .publicVisible(batchId == 0L || (payload.get("publicVisible") != null && Boolean.parseBoolean(String.valueOf(payload.get("publicVisible")))))
                 .publicAccessLevel(String.valueOf(payload.getOrDefault("publicAccessLevel", "LEAD_REQUIRED")))
                 .publicAttemptLimit(payload.get("publicAttemptLimit") == null ? 1 : Integer.valueOf(String.valueOf(payload.get("publicAttemptLimit"))))
@@ -119,13 +129,17 @@ public class TrainerPseudoCodeChallengeService {
             for (Object obj : testCases) {
                 if (!(obj instanceof Map<?, ?> tc)) continue;
 
+                boolean isHidden = tc.containsKey("hidden")
+                        ? Boolean.parseBoolean(String.valueOf(tc.get("hidden")))
+                        : index >= 3;
+
                 challenge.getTestCases().add(
                         PseudoCodeTestCase.builder()
                                 .challenge(challenge)
                                 .inputData(getString(tc, "inputData", ""))
                                 .expectedOutput(getString(tc, "expectedOutput", ""))
                                 .marks(getInt(tc, "marks", 0))
-                                .hidden(index >= 3)
+                                .hidden(isHidden)
                                 .build()
                 );
 
@@ -212,6 +226,12 @@ public class TrainerPseudoCodeChallengeService {
                  String.valueOf(payload.getOrDefault("skill", challenge.getSkill()))
          );
 
+         challenge.setDifficultyLevel(
+                 payload.get("difficulty") != null ? String.valueOf(payload.get("difficulty")).trim().toUpperCase(Locale.ROOT)
+                 : (payload.get("difficultyLevel") != null ? String.valueOf(payload.get("difficultyLevel")).trim().toUpperCase(Locale.ROOT)
+                 : challenge.getDifficultyLevel())
+         );
+
          Object askedYearObj = payload.get("askedYear");
          if (askedYearObj != null && !String.valueOf(askedYearObj).isBlank()) {
              try {
@@ -260,13 +280,17 @@ public class TrainerPseudoCodeChallengeService {
 
                 if (!(obj instanceof Map<?, ?> tc)) continue;
 
+                boolean isHidden = tc.containsKey("hidden")
+                        ? Boolean.parseBoolean(String.valueOf(tc.get("hidden")))
+                        : index >= 3;
+
                 challenge.getTestCases().add(
                         PseudoCodeTestCase.builder()
                                 .challenge(challenge)
                                 .inputData(getString(tc, "inputData", ""))
                                 .expectedOutput(getString(tc, "expectedOutput", ""))
                                 .marks(getInt(tc, "marks", 0))
-                                .hidden(index >= 3)
+                                .hidden(isHidden)
                                 .build()
                 );
                 index++;
@@ -312,7 +336,10 @@ public class TrainerPseudoCodeChallengeService {
 
         for (Map<String, Object> payload : payloads) {
             try {
-                Map<String, Object> saved = createChallenge(payload, groupId, groupTitle, companyName);
+                String individualCompanyName = payload.get("companyName") != null && !String.valueOf(payload.get("companyName")).isBlank()
+                        ? String.valueOf(payload.get("companyName"))
+                        : companyName;
+                Map<String, Object> saved = createChallenge(payload, groupId, groupTitle, individualCompanyName);
                 created.add(saved);
                 successCount++;
             } catch (Exception ex) {
@@ -338,6 +365,37 @@ public class TrainerPseudoCodeChallengeService {
                 "successCount", successCount,
                 "failedCount", failedCount,
                 "results", created
+        );
+    }
+
+    @Transactional
+    public Map<String, Object> updateChallengeGroup(String groupId, Map<String, Object> payload) {
+        String email = securityUtils.getCurrentUserEmail();
+        List<PseudoCodeChallenge> challenges = challengeRepository.findByChallengeGroupId(groupId);
+        if (challenges.isEmpty()) {
+            throw new RuntimeException("Group not found");
+        }
+
+        String newTitle = String.valueOf(payload.getOrDefault("title", ""));
+        String newCompany = String.valueOf(payload.getOrDefault("companyName", ""));
+
+        for (PseudoCodeChallenge challenge : challenges) {
+            if (!email.equals(challenge.getTrainerEmail())) {
+                throw new RuntimeException("Access denied");
+            }
+            if (payload.containsKey("title") && !newTitle.isBlank()) {
+                challenge.setChallengeGroupTitle(newTitle);
+            }
+            if (payload.containsKey("companyName")) {
+                challenge.setCompanyName(newCompany);
+            }
+            challengeRepository.save(challenge);
+        }
+
+        return Map.of(
+                "challengeGroupId", groupId,
+                "success", true,
+                "message", "Challenge group updated successfully"
         );
     }
 
@@ -444,6 +502,7 @@ public class TrainerPseudoCodeChallengeService {
         map.put("publicAttemptLimit", challenge.getPublicAttemptLimit());
         map.put("publishedAt", challenge.getPublishedAt());
         map.put("hintText", challenge.getHintText());
+        map.put("difficultyLevel", challenge.getDifficultyLevel() == null ? "MEDIUM" : challenge.getDifficultyLevel());
         return map;
     }
 

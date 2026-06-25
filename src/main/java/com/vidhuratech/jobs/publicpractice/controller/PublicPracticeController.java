@@ -94,6 +94,35 @@ public class PublicPracticeController {
                 .build();
     }
 
+    @PostMapping("/challenges/{id}/review")
+    public ApiResponse<?> reviewChallenge(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> payload
+    ) {
+        String code = String.valueOf(payload.getOrDefault("code", ""));
+        String language = String.valueOf(payload.getOrDefault("language", ""));
+        String accessToken = String.valueOf(payload.getOrDefault("accessToken", ""));
+
+        return ApiResponse.builder()
+                .success(true)
+                .message("Code review generated successfully")
+                .data(service.reviewPublicChallenge(id, code, language, accessToken))
+                .build();
+    }
+
+    @PostMapping("/challenges/{id}/ai-hints")
+    public ApiResponse<?> getChallengeAiHints(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> payload
+    ) {
+        String accessToken = String.valueOf(payload.getOrDefault("accessToken", ""));
+        return ApiResponse.builder()
+                .success(true)
+                .message("AI hints generated successfully")
+                .data(service.getPublicChallengeAiHints(id, accessToken))
+                .build();
+    }
+
     @PostMapping("/access/register")
     public ApiResponse<?> registerAccess(
             @RequestBody Map<String, Object> payload

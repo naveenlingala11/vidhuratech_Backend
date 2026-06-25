@@ -10,6 +10,7 @@ import com.vidhuratech.jobs.trainer.repository.PseudoCodeChallengeRepository;
 import com.vidhuratech.jobs.trainer.repository.PseudoCodeDraftRepository;
 import com.vidhuratech.jobs.user.entity.User;
 import com.vidhuratech.jobs.user.repository.UserRepository;
+import com.vidhuratech.jobs.common.service.GeminiService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,7 @@ import java.util.*;
 public class StudentPseudoCodeChallengeService {
 
     private final PseudoCodeChallengeRepository challengeRepository;
+    private final GeminiService geminiService;
     private final PseudoCodeAttemptRepository attemptRepository;
     private final UserRepository userRepository;
     private final BatchEnrollmentRepository batchEnrollmentRepository;
@@ -56,7 +58,7 @@ public class StudentPseudoCodeChallengeService {
         PseudoCodeChallenge challenge = challengeRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Challenge not found"));
 
-        verifyStudentHasAccess(student, challenge.getBatchId());
+        verifyStudentHasAccess(student, challenge);
 
         Map<String, Object> map =
                 mapChallengeForStudent(challenge, student);
@@ -129,7 +131,7 @@ public class StudentPseudoCodeChallengeService {
         PseudoCodeChallenge challenge = challengeRepository.findById(challengeId)
                 .orElseThrow(() -> new RuntimeException("Challenge not found"));
 
-        verifyStudentHasAccess(student, challenge.getBatchId());
+        verifyStudentHasAccess(student, challenge);
 
         String language = String.valueOf(payload.getOrDefault("language", "")).trim().toUpperCase();
         String sourceCode = String.valueOf(payload.getOrDefault("sourceCode", ""));
@@ -260,7 +262,7 @@ public class StudentPseudoCodeChallengeService {
         PseudoCodeChallenge challenge = challengeRepository.findById(challengeId)
                 .orElseThrow(() -> new RuntimeException("Challenge not found"));
 
-        verifyStudentHasAccess(student, challenge.getBatchId());
+        verifyStudentHasAccess(student, challenge);
 
         String language = String.valueOf(payload.get("language")).trim().toUpperCase();
         String sourceCode = String.valueOf(payload.get("sourceCode"));
@@ -361,14 +363,14 @@ public class StudentPseudoCodeChallengeService {
         return userRepository.findByEmail(securityUtils.getCurrentUserEmail())
                 .orElseThrow(() -> new RuntimeException("Student not found"));
     }
-    private void verifyStudentHasAccess(User student, Long batchId) {
-        if (batchId == null || batchId == 0) {
+    private void verifyStudentHasAccess(User student, PseudoCodeChallenge challenge) {
+        if (Boolean.TRUE.equals(challenge.getPublicVisible()) || challenge.getBatchId() == null || challenge.getBatchId() == 0) {
             return;
         }
 
         boolean enrolled = batchEnrollmentRepository.findActiveByStudentEmail(student.getEmail())
                 .stream()
-                .anyMatch(enrollment -> enrollment.getBatch().getId().equals(batchId));
+                .anyMatch(enrollment -> enrollment.getBatch().getId().equals(challenge.getBatchId()));
 
         if (!enrolled) {
             throw new RuntimeException("Access denied");
@@ -443,5 +445,57 @@ public class StudentPseudoCodeChallengeService {
                 "RUST",
                 "TYPESCRIPT"
         ).contains(language);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> reviewChallenge(Long challengeId, Map<String, Object> payload) {
+        User student = getCurrentStudent();
+
+        PseudoCodeChallenge challenge = challengeRepository.findById(challengeId)
+                .orElseThrow(() -> new RuntimeException("Challenge not found"));
+
+        verifyStudentHasAccess(student, challenge);
+
+        String language = String.valueOf(payload.getOrDefault("language", "")).trim().toUpperCase();
+        String sourceCode = String.valueOf(payload.getOrDefault("sourceCode", ""));
+
+        if (!supportedLanguage(language)) {
+            throw new RuntimeException("Unsupported language");
+        }
+
+        String reviewMarkdown = geminiService.getReview(
+                challenge.getTitle(),
+                challenge.getProblemStatement(),
+                sourceCode,
+                language
+        );
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("challengeId", challengeId);
+        response.put("review", reviewMarkdown);
+        return response;
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getAiHints(Long challengeId) {
+        User student = getCurrentStudent();
+
+        PseudoCodeChallenge challenge = challengeRepository.findById(challengeId)
+                .orElseThrow(() -> new RuntimeException("Challenge not found"));
+
+        verifyStudentHasAccess(student, challenge);
+
+        String hintsText = geminiService.getAiHints(
+                challenge.getTitle(),
+                challenge.getProblemStatement(),
+                challenge.getConstraintsText(),
+                challenge.getInputFormat(),
+                challenge.getOutputFormat()
+        );
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("challengeId", challengeId);
+        response.put("hints", hintsText);
+        return response;
     }
 }

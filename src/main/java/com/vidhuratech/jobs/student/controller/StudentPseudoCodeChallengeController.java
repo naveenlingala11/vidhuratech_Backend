@@ -65,4 +65,25 @@ public class StudentPseudoCodeChallengeController {
                 .data(service.saveDraft(id, payload))
                 .build();
     }
+
+    @PostMapping("/{id}/review")
+    public ApiResponse<?> review(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> payload
+    ) {
+        return ApiResponse.builder()
+                .success(true)
+                .message("Code review generated successfully")
+                .data(service.reviewChallenge(id, payload))
+                .build();
+    }
+
+    @GetMapping("/{id}/ai-hints")
+    public ApiResponse<?> getAiHints(@PathVariable Long id) {
+        return ApiResponse.builder()
+                .success(true)
+                .message("AI hints generated successfully")
+                .data(service.getAiHints(id))
+                .build();
+    }
 }
