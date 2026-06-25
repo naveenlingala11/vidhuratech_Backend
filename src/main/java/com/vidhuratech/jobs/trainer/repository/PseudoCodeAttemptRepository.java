@@ -9,6 +9,8 @@ public interface PseudoCodeAttemptRepository extends JpaRepository<PseudoCodeAtt
 
     List<PseudoCodeAttempt> findByChallengeIdOrderBySubmittedAtDesc(Long challengeId);
 
+    long countByChallengeId(Long challengeId);
+
     List<PseudoCodeAttempt> findByStudentIdOrderBySubmittedAtDesc(Long studentId);
 
     List<PseudoCodeAttempt> findByChallengeIdAndStudentIdOrderBySubmittedAtDesc(
