@@ -74,13 +74,13 @@ public class PublicPracticeService {
     @Transactional(readOnly = true)
     public Map<String, Object> getPracticeLibrary() {
         List<Map<String, Object>> assessments = assessmentRepository
-                .findActivePublicAssessments(LocalDateTime.now())
+                .findActivePublicAssessmentsLight(LocalDateTime.now())
                 .stream()
                 .map(this::mapAssessmentCard)
                 .toList();
 
         List<Map<String, Object>> challenges = challengeRepository
-                .findByActiveTrueAndPublicVisibleTrueOrderByPublishedAtDesc()
+                .findActivePublicChallengesLight()
                 .stream()
                 .map(this::mapChallengeCard)
                 .toList();
@@ -551,7 +551,11 @@ public class PublicPracticeService {
                 : assessment.getSkill());
         map.put("durationMinutes", assessment.getDurationMinutes() == null ? 0 : assessment.getDurationMinutes());
         map.put("totalMarks", assessment.getTotalMarks() == null ? 0 : assessment.getTotalMarks());
-        map.put("questionCount", assessment.getQuestions() == null ? 0 : assessment.getQuestions().size());
+        try {
+            map.put("questionCount", assessment.getQuestions() == null ? 0 : assessment.getQuestions().size());
+        } catch (Exception e) {
+            map.put("questionCount", 0);
+        }
         map.put("accessLevel", assessment.getPublicAccessLevel());
         map.put("attemptLimit", assessment.getPublicAttemptLimit());
 
@@ -573,7 +577,11 @@ public class PublicPracticeService {
                 : challenge.getSkill());
         map.put("durationMinutes", challenge.getDurationMinutes() == null ? 0 : challenge.getDurationMinutes());
         map.put("totalMarks", challenge.getTotalMarks() == null ? 0 : challenge.getTotalMarks());
-        map.put("questionCount", challenge.getTestCases() == null ? 0 : challenge.getTestCases().size());
+        try {
+            map.put("questionCount", challenge.getTestCases() == null ? 0 : challenge.getTestCases().size());
+        } catch (Exception e) {
+            map.put("questionCount", 0);
+        }
         map.put("challengeGroupTitle", safe(challenge.getChallengeGroupTitle()));
         map.put("accessLevel", challenge.getPublicAccessLevel());
         map.put("attemptLimit", challenge.getPublicAttemptLimit());

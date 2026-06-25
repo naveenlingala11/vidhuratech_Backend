@@ -6,6 +6,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -50,4 +51,95 @@ public interface JobRepository extends JpaRepository<Job, Long>, JpaSpecificatio
     AND j.postedAt >= :date
     """)
     long countRecent(@Param("date") LocalDateTime date);
+
+    @Modifying
+    @Query(value = """
+        DELETE FROM job_skills js
+        WHERE js.job_id IN (
+            SELECT j.id FROM jobs j
+            WHERE j.location IS NULL
+               OR (
+                   LOWER(j.location) NOT LIKE '%india%'
+                   AND LOWER(j.location) NOT LIKE '%bangalore%'
+                   AND LOWER(j.location) NOT LIKE '%bengaluru%'
+                   AND LOWER(j.location) NOT LIKE '%hyderabad%'
+                   AND LOWER(j.location) NOT LIKE '%pune%'
+                   AND LOWER(j.location) NOT LIKE '%mumbai%'
+                   AND LOWER(j.location) NOT LIKE '%noida%'
+                   AND LOWER(j.location) NOT LIKE '%gurgaon%'
+                   AND LOWER(j.location) NOT LIKE '%gurugram%'
+                   AND LOWER(j.location) NOT LIKE '%delhi%'
+                   AND LOWER(j.location) NOT LIKE '%chennai%'
+                   AND LOWER(j.location) NOT LIKE '%kolkata%'
+                   AND LOWER(j.location) NOT LIKE '%ahmedabad%'
+                   AND LOWER(j.location) NOT LIKE '%kochi%'
+                   AND LOWER(j.location) NOT LIKE '%cochin%'
+                   AND LOWER(j.location) NOT LIKE '%jaipur%'
+                   AND LOWER(j.location) NOT LIKE '%indore%'
+                   AND LOWER(j.location) NOT LIKE '%coimbatore%'
+                   AND LOWER(j.location) NOT LIKE '%chandigarh%'
+                   AND LOWER(j.location) NOT LIKE '%nagpur%'
+                   AND LOWER(j.location) NOT LIKE '%lucknow%'
+                   AND LOWER(j.location) NOT LIKE '%bhopal%'
+                   AND LOWER(j.location) NOT LIKE '%trivandrum%'
+                   AND LOWER(j.location) NOT LIKE '%thiruvananthapuram%'
+                   AND LOWER(j.location) NOT LIKE '%visakhapatnam%'
+                   AND LOWER(j.location) NOT LIKE '%vizag%'
+                   AND LOWER(j.location) NOT LIKE '%mysore%'
+                   AND LOWER(j.location) NOT LIKE '%mysuru%'
+                   AND LOWER(j.location) NOT LIKE '%madurai%'
+                   AND LOWER(j.location) NOT LIKE '%surat%'
+                   AND LOWER(j.location) NOT LIKE '%vadodara%'
+                   AND LOWER(j.location) NOT LIKE '%vijayawada%'
+                   AND LOWER(j.location) NOT LIKE '%mangalore%'
+                   AND LOWER(j.location) NOT LIKE '%mangaluru%'
+                   AND LOWER(j.location) NOT LIKE '%remote%'
+               )
+        )
+        """, nativeQuery = true)
+    int deleteJobSkillsForNonIndiaJobs();
+
+    @Modifying
+    @Query(value = """
+        DELETE FROM jobs j
+        WHERE j.location IS NULL
+           OR (
+               LOWER(j.location) NOT LIKE '%india%'
+               AND LOWER(j.location) NOT LIKE '%bangalore%'
+               AND LOWER(j.location) NOT LIKE '%bengaluru%'
+               AND LOWER(j.location) NOT LIKE '%hyderabad%'
+               AND LOWER(j.location) NOT LIKE '%pune%'
+               AND LOWER(j.location) NOT LIKE '%mumbai%'
+               AND LOWER(j.location) NOT LIKE '%noida%'
+               AND LOWER(j.location) NOT LIKE '%gurgaon%'
+               AND LOWER(j.location) NOT LIKE '%gurugram%'
+               AND LOWER(j.location) NOT LIKE '%delhi%'
+               AND LOWER(j.location) NOT LIKE '%chennai%'
+               AND LOWER(j.location) NOT LIKE '%kolkata%'
+               AND LOWER(j.location) NOT LIKE '%ahmedabad%'
+               AND LOWER(j.location) NOT LIKE '%kochi%'
+               AND LOWER(j.location) NOT LIKE '%cochin%'
+               AND LOWER(j.location) NOT LIKE '%jaipur%'
+               AND LOWER(j.location) NOT LIKE '%indore%'
+               AND LOWER(j.location) NOT LIKE '%coimbatore%'
+               AND LOWER(j.location) NOT LIKE '%chandigarh%'
+               AND LOWER(j.location) NOT LIKE '%nagpur%'
+               AND LOWER(j.location) NOT LIKE '%lucknow%'
+               AND LOWER(j.location) NOT LIKE '%bhopal%'
+               AND LOWER(j.location) NOT LIKE '%trivandrum%'
+               AND LOWER(j.location) NOT LIKE '%thiruvananthapuram%'
+               AND LOWER(j.location) NOT LIKE '%visakhapatnam%'
+               AND LOWER(j.location) NOT LIKE '%vizag%'
+               AND LOWER(j.location) NOT LIKE '%mysore%'
+               AND LOWER(j.location) NOT LIKE '%mysuru%'
+               AND LOWER(j.location) NOT LIKE '%madurai%'
+               AND LOWER(j.location) NOT LIKE '%surat%'
+               AND LOWER(j.location) NOT LIKE '%vadodara%'
+               AND LOWER(j.location) NOT LIKE '%vijayawada%'
+               AND LOWER(j.location) NOT LIKE '%mangalore%'
+               AND LOWER(j.location) NOT LIKE '%mangaluru%'
+               AND LOWER(j.location) NOT LIKE '%remote%'
+           )
+        """, nativeQuery = true)
+    int deleteNonIndiaJobs();
 }

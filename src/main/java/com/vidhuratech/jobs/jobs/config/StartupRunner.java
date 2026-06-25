@@ -1,30 +1,38 @@
 package com.vidhuratech.jobs.jobs.config;
 
 import com.vidhuratech.jobs.jobs.service.JobService;
-import org.springframework.boot.ApplicationRunner;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Component;
 
-@Configuration
+@Component
 public class StartupRunner {
 
-    @Bean
-    public ApplicationRunner runAfterStartup(ScraperConfigLoader loader, JobService jobService) {
-        return args -> {
-            new Thread(() -> {
-                try {
-                    // ⏳ wait for app to be ready
-                    Thread.sleep(20000);
+    private final ScraperConfigLoader loader;
+    private final JobService jobService;
 
-                    loader.load(); // ✅ YOUR METHOD
+    public StartupRunner(ScraperConfigLoader loader, JobService jobService) {
+        this.loader = loader;
+        this.jobService = jobService;
+    }
 
-                    // 🧹 Clean non-India legacy jobs from DB
-                    jobService.cleanNonIndiaJobs();
+    @Async
+    @EventListener(ApplicationReadyEvent.class)
+    public void runAfterStartup() {
+        try {
+            // ⏳ Small delay to let all beans fully initialize
+            Thread.sleep(5000);
 
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }).start();
-        };
+            // ✅ Each call is @Transactional — gets its own DB connection and releases immediately
+            loader.load();
+
+            // 🧹 Clean non-India legacy jobs (SQL-level, fast)
+            jobService.cleanNonIndiaJobs();
+
+        } catch (Exception e) {
+            System.err.println("❌ Startup task error: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 }

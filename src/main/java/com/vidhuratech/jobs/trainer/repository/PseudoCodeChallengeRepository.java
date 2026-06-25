@@ -44,6 +44,14 @@ public interface PseudoCodeChallengeRepository extends JpaRepository<PseudoCodeC
     """)
     List<PseudoCodeChallenge> findByActiveTrueAndPublicVisibleTrueOrderByPublishedAtDesc();
 
+    @Query("""
+        SELECT c
+        FROM PseudoCodeChallenge c
+        WHERE c.active = true AND c.publicVisible = true
+        ORDER BY c.publishedAt DESC NULLS LAST, c.id DESC
+    """)
+    List<PseudoCodeChallenge> findActivePublicChallengesLight();
+
     List<PseudoCodeChallenge> findAllByOrderByIdDesc();
 
     @Query("""
