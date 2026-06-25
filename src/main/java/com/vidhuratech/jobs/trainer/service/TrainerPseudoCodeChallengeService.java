@@ -474,9 +474,7 @@ public class TrainerPseudoCodeChallengeService {
     }
 
     private Map<String, Object> mapChallengeListItem(PseudoCodeChallenge challenge) {
-        Long attemptCount = attemptRepository.findByChallengeIdOrderBySubmittedAtDesc(challenge.getId())
-                .stream()
-                .count();
+        long attemptCount = attemptRepository.countByChallengeId(challenge.getId());
 
         Map<String, Object> map = new LinkedHashMap<>();
 
