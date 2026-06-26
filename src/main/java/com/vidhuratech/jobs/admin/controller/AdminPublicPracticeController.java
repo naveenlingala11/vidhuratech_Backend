@@ -99,6 +99,7 @@ public class AdminPublicPracticeController {
         assessment.setPublicVisible(true);
         assessment.setPublishedAt(LocalDateTime.now());
         assessment.setPublishedByUserId(securityUtils.getCurrentUserId());
+        assessment.setEndTime(null);
 
         Assessment saved = assessmentRepository.save(assessment);
 
@@ -409,6 +410,7 @@ public class AdminPublicPracticeController {
                     assessment.setPublicVisible(true);
                     assessment.setPublishedAt(now);
                     assessment.setPublishedByUserId(currentUserId);
+                    assessment.setEndTime(null);
                 } else {
                     assessment.setPublicVisible(false);
                 }

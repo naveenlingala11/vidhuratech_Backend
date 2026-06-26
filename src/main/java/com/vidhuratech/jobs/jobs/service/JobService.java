@@ -12,8 +12,12 @@ import com.vidhuratech.jobs.jobs.repository.SkillRepository;
 import com.vidhuratech.jobs.jobs.spec.JobSpecification;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -23,22 +27,26 @@ import java.util.concurrent.Executors;
 @Service
 public class JobService {
 
+    private static final Logger log = LoggerFactory.getLogger(JobService.class);
+
     private final JobRepository jobRepo;
     private final CompanyRepository companyRepo;
     private final SkillRepository skillRepo;
+    private final TransactionTemplate transactionTemplate;
 
     public JobService(JobRepository jobRepo,
                       CompanyRepository companyRepo,
-                      SkillRepository skillRepo) {
+                      SkillRepository skillRepo,
+                      PlatformTransactionManager transactionManager) {
         this.jobRepo = jobRepo;
         this.companyRepo = companyRepo;
         this.skillRepo = skillRepo;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     // ─────────────────────────────────────────────────────────
     // SAVE
     // ─────────────────────────────────────────────────────────
-    @Transactional
     public void saveJob(Job job, String companyName) {
 
         try {
@@ -59,49 +67,51 @@ public class JobService {
             // Normalise location to avoid duplicates in filters (e.g. bangalore vs Bengaluru)
             job.setLocation(normalizeLocation(job.getLocation()));
 
-            Company company = companyRepo.findByNameIgnoreCase(companyName)
-                    .orElseGet(() -> {
-                        Company c = new Company();
-                        c.setName(companyName);
-                        return companyRepo.save(c);
-                    });
+            transactionTemplate.executeWithoutResult(status -> {
+                Company company = companyRepo.findByNameIgnoreCase(companyName)
+                        .orElseGet(() -> {
+                            Company c = new Company();
+                            c.setName(companyName);
+                            return companyRepo.save(c);
+                        });
 
-            job.setCompany(company);
+                job.setCompany(company);
 
-            // 🔥 DUPLICATE CHECK (MOST IMPORTANT)
-            boolean exists = jobRepo.existsByTitleAndCompanyAndApplyLink(
-                    job.getTitle(),
-                    company,
-                    job.getApplyLink()
-            );
+                // 🔥 DUPLICATE CHECK (MOST IMPORTANT)
+                boolean exists = jobRepo.existsByTitleAndCompanyAndApplyLink(
+                        job.getTitle(),
+                        company,
+                        job.getApplyLink()
+                );
 
-            if (exists) {
-                return;
-            }
+                if (exists) {
+                    return;
+                }
 
-            if (job.getPostedAt() == null) {
-                job.setPostedAt(LocalDateTime.now());
-            }
+                if (job.getPostedAt() == null) {
+                    job.setPostedAt(LocalDateTime.now());
+                }
 
-            Job saved = jobRepo.save(job);
-            jobRepo.flush();
+                Job saved = jobRepo.save(job);
+                jobRepo.flush();
 
-            Set<Skill> skills = new HashSet<>();
+                Set<Skill> skills = new HashSet<>();
 
-            if (job.getSkillsCsv() != null) {
-                for (String s : job.getSkillsCsv().split(",")) {
-                    String skill = s.trim();
-                    if (!skill.isEmpty()) {
-                        skills.add(
-                                skillRepo.findByNameIgnoreCase(skill)
-                                        .orElseGet(() -> skillRepo.save(new Skill(null, skill)))
-                        );
+                if (job.getSkillsCsv() != null) {
+                    for (String s : job.getSkillsCsv().split(",")) {
+                        String skill = s.trim();
+                        if (!skill.isEmpty()) {
+                            skills.add(
+                                    skillRepo.findByNameIgnoreCase(skill)
+                                            .orElseGet(() -> skillRepo.save(new Skill(null, skill)))
+                            );
+                        }
                     }
                 }
-            }
 
-            saved.setSkills(skills);
-            jobRepo.save(saved);
+                saved.setSkills(skills);
+                jobRepo.save(saved);
+            });
 
         } catch (Exception e) {
             e.printStackTrace(); // 🔥 VERY IMPORTANT
@@ -257,15 +267,14 @@ public class JobService {
 
     @Transactional
     public void cleanNonIndiaJobs() {
-        System.out.println("🧹 STARTING CLEANUP OF NON-INDIA JOBS...");
+        log.debug("🧹 STARTING CLEANUP OF NON-INDIA JOBS...");
         try {
             int skillsDeleted = jobRepo.deleteJobSkillsForNonIndiaJobs();
-            System.out.println("🔗 Removed " + skillsDeleted + " job_skills references.");
+            log.debug("🔗 Removed {} job_skills references.", skillsDeleted);
             int deleted = jobRepo.deleteNonIndiaJobs();
-            System.out.println("🗑️ DELETED " + deleted + " NON-INDIA JOBS (SQL-level cleanup).");
+            log.debug("🗑️ DELETED {} NON-INDIA JOBS (SQL-level cleanup).", deleted);
         } catch (Exception e) {
-            System.err.println("❌ ERROR CLEANING NON-INDIA JOBS: " + e.getMessage());
-            e.printStackTrace();
+            log.error("❌ ERROR CLEANING NON-INDIA JOBS", e);
         }
     }
 
@@ -282,8 +291,7 @@ public class JobService {
                 jobRepo.deleteByCompanyAndApplyLinkNotIn(company, activeApplyLinks);
             }
         } catch (Exception e) {
-            System.err.println("❌ ERROR CLEANING EXPIRED JOBS FOR " + companyName + ": " + e.getMessage());
-            e.printStackTrace();
+            log.error("❌ ERROR CLEANING EXPIRED JOBS FOR {}", companyName, e);
         }
     }
 
@@ -335,11 +343,11 @@ public class JobService {
     }
 
     public void validateAllJobLinks() {
-        System.out.println("🔍 STARTING DYNAMIC VALIDATION OF ALL JOB LINKS...");
+        log.debug("🔍 STARTING DYNAMIC VALIDATION OF ALL JOB LINKS...");
         try {
             List<Job> allJobs = jobRepo.findAll();
             int total = allJobs.size();
-            System.out.println("📋 Total jobs to validate: " + total);
+            log.debug("📋 Total jobs to validate: {}", total);
             
             try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
                 for (Job job : allJobs) {
@@ -353,9 +361,9 @@ public class JobService {
                     });
                 }
             }
-            System.out.println("✅ JOB LINKS VALIDATION COMPLETED.");
+            log.debug("✅ JOB LINKS VALIDATION COMPLETED.");
         } catch (Exception e) {
-            System.err.println("❌ ERROR VALIDATING JOB LINKS: " + e.getMessage());
+            log.error("❌ ERROR VALIDATING JOB LINKS", e);
         }
     }
 
@@ -363,7 +371,7 @@ public class JobService {
     public void deleteJobInTransaction(Long id, String title) {
         try {
             jobRepo.deleteById(id);
-            System.out.println("🗑️ PRUNED EXPIRED/404 JOB: " + title + " (ID: " + id + ")");
+            log.debug("🗑️ PRUNED EXPIRED/404 JOB: {} (ID: {})", title, id);
         } catch (Exception e) {
             // ignore
         }

@@ -77,22 +77,18 @@ public interface AssessmentRepository extends JpaRepository<Assessment, Long> {
     LEFT JOIN FETCH b.course
     WHERE a.active = true
     AND a.publicVisible = true
-    AND (a.startTime IS NULL OR a.startTime <= :now)
-    AND (a.endTime IS NULL OR a.endTime >= :now)
-    ORDER BY a.publishedAt DESC, a.id DESC
+    ORDER BY a.publishedAt DESC NULLS LAST, a.id DESC
 """)
-    List<Assessment> findActivePublicAssessments(LocalDateTime now);
+    List<Assessment> findActivePublicAssessments();
 
     @Query("""
     SELECT a
     FROM Assessment a
     WHERE a.active = true
     AND a.publicVisible = true
-    AND (a.startTime IS NULL OR a.startTime <= :now)
-    AND (a.endTime IS NULL OR a.endTime >= :now)
-    ORDER BY a.publishedAt DESC, a.id DESC
+    ORDER BY a.publishedAt DESC NULLS LAST, a.id DESC
 """)
-    List<Assessment> findActivePublicAssessmentsLight(LocalDateTime now);
+    List<Assessment> findActivePublicAssessmentsLight();
 
     @Query("SELECT q.assessment.id, COUNT(q) FROM AssessmentQuestion q WHERE q.assessment.id IN :assessmentIds GROUP BY q.assessment.id")
     List<Object[]> countQuestionsForAssessments(@org.springframework.data.repository.query.Param("assessmentIds") List<Long> assessmentIds);
