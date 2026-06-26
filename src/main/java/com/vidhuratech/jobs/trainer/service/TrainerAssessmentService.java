@@ -59,7 +59,8 @@ public class TrainerAssessmentService {
                         .orElseThrow(() -> new RuntimeException("Trainer user not found"));
             }
 
-            boolean publicVisible = batchId == 0L || (payload.get("publicVisible") != null && Boolean.parseBoolean(String.valueOf(payload.get("publicVisible"))));
+            boolean publicVisible = payload.get("publicVisible") == null
+                    || Boolean.parseBoolean(String.valueOf(payload.get("publicVisible")));
 
             Object askedYearObj = payload.get("askedYear");
             Integer askedYear = null;
@@ -78,8 +79,8 @@ public class TrainerAssessmentService {
                     .durationMinutes(Integer.valueOf(
                             String.valueOf(payload.get("durationMinutes"))
                     ))
-                    .startTime(LocalDateTime.now())
-                    .endTime(LocalDateTime.now().plusDays(30))
+                    .startTime(batchId == 0L ? null : LocalDateTime.now())
+                    .endTime(batchId == 0L || publicVisible ? null : LocalDateTime.now().plusDays(30))
                     .batch(batch)
                     .trainer(trainerUser)
                     .active(true)
@@ -87,6 +88,8 @@ public class TrainerAssessmentService {
                     .skill(String.valueOf(payload.getOrDefault("skill", "Placement Readiness")))
                     .askedYear(askedYear)
                     .publicVisible(publicVisible)
+                    .publishedAt(publicVisible ? LocalDateTime.now() : null)
+                    .publishedByUserId(publicVisible ? securityUtils.getCurrentUserId() : null)
                     .publicAccessLevel(String.valueOf(payload.getOrDefault("publicAccessLevel", "LEAD_REQUIRED")))
                     .publicAttemptLimit(payload.get("publicAttemptLimit") == null ? 1 : Integer.valueOf(String.valueOf(payload.get("publicAttemptLimit"))))
                     .build();

@@ -73,7 +73,7 @@ public class PublicPracticeService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> getPracticeLibrary() {
-        List<Assessment> activeAssessments = assessmentRepository.findActivePublicAssessmentsLight(LocalDateTime.now());
+        List<Assessment> activeAssessments = assessmentRepository.findActivePublicAssessmentsLight();
         List<PseudoCodeChallenge> activeChallenges = challengeRepository.findActivePublicChallengesLight();
 
         List<Long> assessmentIds = activeAssessments.stream().map(Assessment::getId).toList();
