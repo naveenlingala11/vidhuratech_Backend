@@ -403,9 +403,10 @@ public class TrainerPseudoCodeChallengeService {
     public List<Map<String, Object>> getTrainerChallenges() {
         String email = securityUtils.getCurrentUserEmail();
 
-        return challengeRepository.findByTrainerEmailOrderByCreatedAtDesc(email)
+        // Single query with subquery counts — no N+1!
+        return challengeRepository.findTrainerChallengeListItems(email)
                 .stream()
-                .map(this::mapChallengeListItem)
+                .map(this::mapChallengeRow)
                 .toList();
     }
 
@@ -471,6 +472,35 @@ public class TrainerPseudoCodeChallengeService {
                 "CHALLENGE_DELETED",
                 "/dashboard/admin/public-practice"
         );
+    }
+
+    // Maps native query Object[] row — zero additional queries
+    private Map<String, Object> mapChallengeRow(Object[] row) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("id", row[0]);
+        map.put("batchId", row[1]);
+        map.put("title", row[2]);
+        map.put("problemStatement", row[3]);
+        map.put("durationMinutes", row[4]);
+        map.put("totalMarks", row[5]);
+        map.put("passPercentage", row[6]);
+        map.put("active", Boolean.TRUE.equals(row[7]));
+        map.put("createdAt", row[8]);
+        map.put("challengeGroupId", row[9] == null ? "LEGACY-" + row[0] : row[9]);
+        map.put("challengeGroupTitle", row[10] == null ? row[2] : row[10]);
+        map.put("companyName", row[11] == null ? "" : row[11]);
+        map.put("skill", row[12] == null ? "Coding" : row[12]);
+        map.put("askedYear", row[13]);
+        map.put("publicVisible", Boolean.TRUE.equals(row[14]));
+        map.put("publicAccessLevel", row[15]);
+        map.put("publicAttemptLimit", row[16]);
+        map.put("publishedAt", row[17]);
+        map.put("hintText", row[18]);
+        map.put("difficultyLevel", row[19] == null ? "MEDIUM" : row[19]);
+        map.put("rulesCount", ((Number) row[20]).intValue());
+        map.put("testCasesCount", ((Number) row[21]).intValue());
+        map.put("attemptCount", ((Number) row[22]).longValue());
+        return map;
     }
 
     private Map<String, Object> mapChallengeListItem(PseudoCodeChallenge challenge) {

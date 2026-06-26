@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -44,9 +45,41 @@ public class StudentPseudoCodeChallengeService {
 
         boolean hasBatches = !batchIds.isEmpty();
 
-        return challengeRepository.findActiveChallengesForStudentAndPublic(hasBatches, batchIds)
-                .stream()
-                .map(challenge -> mapChallengeForStudent(challenge, student))
+        List<PseudoCodeChallenge> challenges = challengeRepository.findActiveChallengesForStudentAndPublic(hasBatches, batchIds);
+
+        if (challenges.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Long> challengeIds = challenges.stream().map(PseudoCodeChallenge::getId).toList();
+
+        // 1. Fetch all student attempts for these challenges in one query eagerly joining challenge
+        List<PseudoCodeAttempt> allAttempts = attemptRepository.findByStudentIdWithChallengeEagerly(student.getId());
+        Map<Long, List<PseudoCodeAttempt>> attemptsByChallengeId = allAttempts.stream()
+                .filter(a -> a.getChallenge() != null && challengeIds.contains(a.getChallenge().getId()))
+                .collect(Collectors.groupingBy(a -> a.getChallenge().getId()));
+
+        // 2. Fetch rules count in batch
+        Map<Long, Integer> rulesCountMap = new HashMap<>();
+        List<Object[]> rulesCounts = challengeRepository.countRulesForChallenges(challengeIds);
+        for (Object[] row : rulesCounts) {
+            rulesCountMap.put((Long) row[0], ((Number) row[1]).intValue());
+        }
+
+        // 3. Fetch test cases count in batch
+        Map<Long, Integer> testCasesCountMap = new HashMap<>();
+        List<Object[]> testCasesCounts = challengeRepository.countTestCasesForChallenges(challengeIds);
+        for (Object[] row : testCasesCounts) {
+            testCasesCountMap.put((Long) row[0], ((Number) row[1]).intValue());
+        }
+
+        return challenges.stream()
+                .map(challenge -> {
+                    List<PseudoCodeAttempt> attempts = attemptsByChallengeId.getOrDefault(challenge.getId(), Collections.emptyList());
+                    int rulesCount = rulesCountMap.getOrDefault(challenge.getId(), 0);
+                    int testCasesCount = testCasesCountMap.getOrDefault(challenge.getId(), 0);
+                    return mapChallengeForStudent(challenge, attempts, rulesCount, testCasesCount);
+                })
                 .toList();
     }
 
@@ -398,7 +431,17 @@ public class StudentPseudoCodeChallengeService {
                         challenge.getId(),
                         student.getId()
                 );
+        int rulesCount = challenge.getRules() == null ? 0 : challenge.getRules().size();
+        int testCasesCount = challenge.getTestCases() == null ? 0 : challenge.getTestCases().size();
+        return mapChallengeForStudent(challenge, attempts, rulesCount, testCasesCount);
+    }
 
+    private Map<String, Object> mapChallengeForStudent(
+            PseudoCodeChallenge challenge,
+            List<PseudoCodeAttempt> attempts,
+            int rulesCount,
+            int testCasesCount
+    ) {
         PseudoCodeAttempt latest = attempts.isEmpty() ? null : attempts.getFirst();
 
         Map<String, Object> map = new LinkedHashMap<>();
@@ -413,8 +456,8 @@ public class StudentPseudoCodeChallengeService {
         map.put("skill", challenge.getSkill() == null ? "" : challenge.getSkill());
         map.put("difficultyLevel", challenge.getDifficultyLevel() == null ? "MEDIUM" : challenge.getDifficultyLevel());
         map.put("createdAt", challenge.getCreatedAt());
-        map.put("rulesCount", challenge.getRules() == null ? 0 : challenge.getRules().size());
-        map.put("testCasesCount", challenge.getTestCases() == null ? 0 : challenge.getTestCases().size());
+        map.put("rulesCount", rulesCount);
+        map.put("testCasesCount", testCasesCount);
         map.put("attemptCount", attempts.size());
         map.put("lastScore", latest == null ? 0 : latest.getScore());
         map.put("percentage", latest == null ? 0 : latest.getPercentage());

@@ -13,6 +13,9 @@ public interface PseudoCodeAttemptRepository extends JpaRepository<PseudoCodeAtt
 
     List<PseudoCodeAttempt> findByStudentIdOrderBySubmittedAtDesc(Long studentId);
 
+    @org.springframework.data.jpa.repository.Query("SELECT a FROM PseudoCodeAttempt a LEFT JOIN FETCH a.challenge WHERE a.student.id = :studentId ORDER BY a.submittedAt DESC")
+    List<PseudoCodeAttempt> findByStudentIdWithChallengeEagerly(@org.springframework.data.repository.query.Param("studentId") Long studentId);
+
     List<PseudoCodeAttempt> findByChallengeIdAndStudentIdOrderBySubmittedAtDesc(
             Long challengeId,
             Long studentId

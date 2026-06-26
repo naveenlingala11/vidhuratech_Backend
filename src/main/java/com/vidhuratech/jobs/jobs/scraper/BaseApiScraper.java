@@ -3,6 +3,8 @@ package com.vidhuratech.jobs.jobs.scraper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vidhuratech.jobs.jobs.entity.Job;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.net.http.*;
@@ -11,6 +13,7 @@ import java.util.*;
 
 public abstract class BaseApiScraper {
 
+    private static final Logger log = LoggerFactory.getLogger(BaseApiScraper.class);
     protected final HttpClient client = HttpClient.newHttpClient();
     protected final ObjectMapper mapper = new ObjectMapper();
 
@@ -25,7 +28,7 @@ public abstract class BaseApiScraper {
             HttpResponse<String> res = client.send(req, HttpResponse.BodyHandlers.ofString());
             return mapper.readTree(res.body());
         } catch (Exception e) {
-            System.out.println("API Error: " + e.getMessage());
+            log.debug("API Error: " + e.getMessage());
             return null;
         }
     }

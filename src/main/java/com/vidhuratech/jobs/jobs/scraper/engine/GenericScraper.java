@@ -5,6 +5,8 @@ import com.vidhuratech.jobs.jobs.scraper.BaseSeleniumScraper;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.select.Elements;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -13,13 +15,15 @@ import java.util.List;
 @Component
 public class GenericScraper extends BaseSeleniumScraper {
 
+    private static final Logger log = LoggerFactory.getLogger(GenericScraper.class);
+
     public List<Job> scrape(ScraperConfig config) {
         // 1️⃣ Fast path: Jsoup (no browser needed)
         try {
             List<Job> jobs = scrapeWithJsoup(config);
             if (!jobs.isEmpty()) return jobs;
         } catch (Exception e) {
-            System.out.println("⚠️ Jsoup failed for [" + config.getCompany() + "] → falling back to Selenium");
+            log.debug("⚠️ Jsoup failed for [" + config.getCompany() + "] → falling back to Selenium");
         }
 
         // 2️⃣ Slow path: Selenium

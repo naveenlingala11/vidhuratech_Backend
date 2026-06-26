@@ -7,6 +7,8 @@ import com.vidhuratech.jobs.jobs.scraper.engine.ApiConfig;
 import com.vidhuratech.jobs.jobs.scraper.engine.ApiScraperEngine;
 import com.vidhuratech.jobs.jobs.scraper.engine.ScraperStatus;
 import org.jsoup.Jsoup;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -16,6 +18,8 @@ import java.util.concurrent.Executors;
 
 @Service
 public class ScraperService {
+
+    private static final Logger log = LoggerFactory.getLogger(ScraperService.class);
 
     private final JobService jobService;
     private final ApiScraperEngine engine;
@@ -38,31 +42,26 @@ public class ScraperService {
     public void scrapeAll() {
 
         if (status.isRunning()) {
-            System.out.println("⛔ Scraper already running...");
+            log.info("Scraper already running, skipping.");
             return;
         }
 
         status.setRunning(true);
 
         try {
-            System.out.println("\n🚀 SCRAPING STARTED\n");
+            log.info("SCRAPING STARTED");
 
             long globalStart = System.currentTimeMillis();
 
             List<ScraperConfigEntity> configs = repo.findByActiveTrue();
 
             if (configs.isEmpty()) {
-                System.out.println("⚠️ No active companies found in DB");
+                log.warn("No active companies found in DB");
                 return;
             }
 
-            // 🔥 OPTION 1: NORMAL (SAFE)
-            // for (ScraperConfigEntity entity : configs) {
-            //     processCompany(entity);
-            // }
-
             // 🔥 OPTION 2: PARALLEL (FASTER)
-            ExecutorService pool = Executors.newFixedThreadPool(3); // NOT 6
+            ExecutorService pool = Executors.newFixedThreadPool(3);
 
             for (ScraperConfigEntity entity : configs) {
                 pool.submit(() -> {
@@ -83,15 +82,14 @@ public class ScraperService {
 
             long globalEnd = System.currentTimeMillis();
 
-            System.out.println("🏁 SCRAPING COMPLETED");
-            System.out.println("⏱ TOTAL TIME: " + ((globalEnd - globalStart) / 1000) + " sec");
+            log.info("SCRAPING COMPLETED in {} sec", (globalEnd - globalStart) / 1000);
 
             // Run sweep validation of all job links to prune dead ones
             jobService.validateAllJobLinks();
 
         } finally {
-            status.setRunning(false); // 🔥 VERY IMPORTANT
-            System.out.println("🔁 STATUS RESET DONE\n");
+            status.setRunning(false);
+            log.debug("Scraper status reset done");
         }
     }
 
@@ -104,7 +102,7 @@ public class ScraperService {
 
         String company = entity.getCompany();
 
-        System.out.println("🔍 START: " + company);
+        log.debug("Scraping: {}", company);
 
         ApiConfig cfg = new ApiConfig();
         cfg.setCompany(company);
@@ -120,24 +118,24 @@ public class ScraperService {
             jobs = retry(cfg);
 
             if (jobs == null) {
-                System.out.println("❌ SCRAPER FAILED (API/Network Error): " + company);
+                log.warn("Scraper failed (API/Network): {}", company);
                 scraperError = true;
             } else {
                 success = true;
                 if (jobs.isEmpty()) {
-                    System.out.println("⚠️ NO JOBS FOUND: " + company);
+                    log.debug("No jobs found: {}", company);
                 }
             }
 
         } catch (Exception e) {
-            System.out.println("❌ ERROR [" + company + "]: " + e.getMessage());
+            log.warn("Scraper error [{}]: {}", company, e.getMessage());
             scraperError = true;
         }
 
         // ───── UPDATE SUCCESS / FAIL ─────
         if (success) {
             entity.setSuccessCount(entity.getSuccessCount() + 1);
-            entity.setFailCount(0); // 🔥 RESET fail count on success!
+            entity.setFailCount(0);
         } else if (scraperError) {
             entity.setFailCount(entity.getFailCount() + 1);
         }
@@ -145,7 +143,7 @@ public class ScraperService {
         // 🔥 AUTO DISABLE BAD COMPANIES
         if (entity.getFailCount() >= 5) {
             entity.setActive(false);
-            System.out.println("🚫 AUTO DISABLED: " + company);
+            log.warn("Auto-disabled company (5+ failures): {}", company);
         }
 
         repo.save(entity);
@@ -159,7 +157,7 @@ public class ScraperService {
                     jobService.saveJob(job, company);
                     saved++;
                 } catch (Exception e) {
-                    System.out.println("⚠️ SAVE ERROR [" + company + "]");
+                    log.debug("Save error [{}]", company);
                 }
             }
         }
@@ -176,13 +174,12 @@ public class ScraperService {
 
         long end = System.currentTimeMillis();
 
-        // 🔥 SAME LOG FORMAT (UNCHANGED)
-        System.out.println("\n==============================");
-        System.out.println("🏢 COMPANY: " + company);
-        System.out.println("📥 Scraped: " + scraped);
-        System.out.println("💾 Saved:   " + saved);
-        System.out.println("⏱ Time:     " + ((end - start) / 1000) + " sec");
-        System.out.println("==============================\n");
+        // Only log companies that actually scraped jobs (skip noise)
+        if (scraped > 0) {
+            log.info("[{}] Scraped: {}, Saved: {}, Time: {}s", company, scraped, saved, (end - start) / 1000);
+        } else {
+            log.debug("[{}] Scraped: 0, Time: {}s", company, (end - start) / 1000);
+        }
     }
 
     // ─────────────────────────────────────────
@@ -197,7 +194,7 @@ public class ScraperService {
                     return jobs;
                 }
             } catch (Exception e) {
-                System.out.println("🔁 Retry " + i + " → " + cfg.getCompany());
+                log.debug("Retry {} for {}", i, cfg.getCompany());
             }
         }
 

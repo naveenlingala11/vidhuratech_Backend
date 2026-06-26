@@ -6,6 +6,8 @@ import com.vidhuratech.jobs.jobs.entity.Job;
 import com.vidhuratech.jobs.jobs.scraper.engine.ApiConfig;
 import com.vidhuratech.jobs.jobs.scraper.engine.ApiScraper;
 import org.jsoup.Jsoup;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -13,6 +15,8 @@ import java.util.List;
 
 @Component
 public class LeverScraper implements ApiScraper {
+
+    private static final Logger log = LoggerFactory.getLogger(LeverScraper.class);
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -41,9 +45,9 @@ public class LeverScraper implements ApiScraper {
                 } catch (Exception ignored) {}
             }
 
-            System.out.println("✅ Lever [" + config.getCompany() + "] → " + jobs.size());
+            log.debug("✅ Lever [" + config.getCompany() + "] → " + jobs.size());
         } catch (Exception e) {
-            System.out.println("❌ Lever [" + config.getCompany() + "]: " + e.getMessage());
+            log.debug("❌ Lever [" + config.getCompany() + "]: " + e.getMessage());
             return null;
         }
         return jobs;

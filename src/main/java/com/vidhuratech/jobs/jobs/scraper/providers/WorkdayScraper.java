@@ -7,6 +7,8 @@ import com.vidhuratech.jobs.jobs.scraper.engine.ApiConfig;
 import com.vidhuratech.jobs.jobs.scraper.engine.ApiScraper;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -14,6 +16,8 @@ import java.util.List;
 
 @Component
 public class WorkdayScraper implements ApiScraper {
+
+    private static final Logger log = LoggerFactory.getLogger(WorkdayScraper.class);
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -63,7 +67,7 @@ public class WorkdayScraper implements ApiScraper {
                 offset += limit;
 
             } catch (Exception e) {
-                System.out.println("❌ Workday [" + config.getCompany() + "] offset=" + offset + ": " + e.getMessage());
+                log.debug("❌ Workday [" + config.getCompany() + "] offset=" + offset + ": " + e.getMessage());
                 failed = true;
                 break;
             }
@@ -73,7 +77,7 @@ public class WorkdayScraper implements ApiScraper {
             return null;
         }
 
-        System.out.println("✅ Workday [" + config.getCompany() + "] → " + jobs.size());
+        log.debug("✅ Workday [" + config.getCompany() + "] → " + jobs.size());
         return jobs;
     }
 

@@ -1,5 +1,7 @@
 package com.vidhuratech.jobs.jobs.scraper;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.vidhuratech.jobs.jobs.entity.Job;
 import io.github.bonigarcia.wdm.WebDriverManager;
 import org.openqa.selenium.*;
@@ -10,6 +12,8 @@ import java.util.*;
 import java.util.function.Function;
 
 public abstract class BaseSeleniumScraper {
+
+    private static final Logger log = LoggerFactory.getLogger(BaseSeleniumScraper.class);
 
     protected WebDriver createDriver() {
         WebDriverManager.chromedriver().setup();
@@ -149,7 +153,7 @@ public abstract class BaseSeleniumScraper {
 
         while (true) {
             try {
-                System.out.println("📄 Scraping page: " + page);
+                log.debug("📄 Scraping page: " + page);
 
                 waitFor(driver, jobCardCss, 20);
                 scrollDown(driver);
@@ -157,7 +161,7 @@ public abstract class BaseSeleniumScraper {
                 List<WebElement> cards = driver.findElements(By.cssSelector(jobCardCss));
 
                 if (cards.isEmpty()) {
-                    System.out.println("⚠️ No jobs found on page " + page);
+                    log.debug("⚠️ No jobs found on page " + page);
                     break;
                 }
 
@@ -166,7 +170,7 @@ public abstract class BaseSeleniumScraper {
                         Job job = jobMapper.apply(c);
                         if (job != null) allJobs.add(job);
                     } catch (Exception e) {
-                        System.out.println("❌ Error parsing job card");
+                        log.debug("❌ Error parsing job card");
                     }
                 }
 
@@ -175,7 +179,7 @@ public abstract class BaseSeleniumScraper {
                     WebElement nextBtn = driver.findElement(By.cssSelector(nextBtnCss));
 
                     if (!nextBtn.isDisplayed() || !nextBtn.isEnabled()) {
-                        System.out.println("⛔ No more pages");
+                        log.debug("⛔ No more pages");
                         break;
                     }
 
@@ -185,17 +189,17 @@ public abstract class BaseSeleniumScraper {
                     page++;
 
                 } catch (Exception e) {
-                    System.out.println("⛔ Pagination ended");
+                    log.debug("⛔ Pagination ended");
                     break;
                 }
 
             } catch (Exception e) {
-                System.out.println("❌ Page error: " + e.getMessage());
+                log.debug("❌ Page error: " + e.getMessage());
                 break;
             }
         }
 
-        System.out.println("✅ Total jobs collected: " + allJobs.size());
+        log.debug("✅ Total jobs collected: " + allJobs.size());
         return allJobs;
     }
 
