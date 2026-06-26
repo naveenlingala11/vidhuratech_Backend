@@ -17,6 +17,9 @@ public interface PublicChallengeAttemptRepository
 
     long countByChallengeId(Long challengeId);
 
+    @Query("SELECT c.challengeId, COUNT(c) FROM PublicChallengeAttempt c WHERE c.challengeId IN :challengeIds GROUP BY c.challengeId")
+    List<Object[]> countAttemptsForChallenges(@Param("challengeIds") List<Long> challengeIds);
+
     @Query("""
         select a from PublicChallengeAttempt a
         where a.challengeId = :challengeId

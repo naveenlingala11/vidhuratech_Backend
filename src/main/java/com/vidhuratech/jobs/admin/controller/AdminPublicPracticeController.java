@@ -45,17 +45,40 @@ public class AdminPublicPracticeController {
     public ApiResponse<?> candidates() {
         Map<String, Object> data = new LinkedHashMap<>();
 
-        data.put("assessments", assessmentRepository.findAllPublicPracticeCandidates()
+        List<Assessment> assessments = assessmentRepository.findAllPublicPracticeCandidates();
+        List<PseudoCodeChallenge> challenges = challengeRepository.findAllPublicPracticeCandidates();
+        List<InterviewQuestion> interviewQuestions = interviewQuestionRepository.findAllPublicCandidates();
+
+        List<Long> assessmentIds = assessments.stream().map(Assessment::getId).toList();
+        List<Long> challengeIds = challenges.stream().map(PseudoCodeChallenge::getId).toList();
+
+        Map<Long, Long> assessmentAttemptCounts = new HashMap<>();
+        if (!assessmentIds.isEmpty()) {
+            List<Object[]> counts = publicAssessmentAttemptRepository.countAttemptsForAssessments(assessmentIds);
+            for (Object[] row : counts) {
+                assessmentAttemptCounts.put((Long) row[0], (Long) row[1]);
+            }
+        }
+
+        Map<Long, Long> challengeAttemptCounts = new HashMap<>();
+        if (!challengeIds.isEmpty()) {
+            List<Object[]> counts = publicChallengeAttemptRepository.countAttemptsForChallenges(challengeIds);
+            for (Object[] row : counts) {
+                challengeAttemptCounts.put((Long) row[0], (Long) row[1]);
+            }
+        }
+
+        data.put("assessments", assessments
                 .stream()
-                .map(this::mapAssessment)
+                .map(a -> mapAssessment(a, assessmentAttemptCounts.getOrDefault(a.getId(), 0L)))
                 .toList());
 
-        data.put("challenges", challengeRepository.findAllPublicPracticeCandidates()
+        data.put("challenges", challenges
                 .stream()
-                .map(this::mapChallenge)
+                .map(c -> mapChallenge(c, challengeAttemptCounts.getOrDefault(c.getId(), 0L)))
                 .toList());
 
-        data.put("interviewQuestions", interviewQuestionRepository.findAllPublicCandidates()
+        data.put("interviewQuestions", interviewQuestions
                 .stream()
                 .map(this::mapInterviewQuestion)
                 .toList());
@@ -239,21 +262,52 @@ public class AdminPublicPracticeController {
     public ApiResponse<?> attempts() {
         Map<String, Object> data = new LinkedHashMap<>();
 
-        List<Map<String, Object>> assessmentAttempts =
-                publicAssessmentAttemptRepository.findTop200ByOrderBySubmittedAtDesc()
-                        .stream()
-                        .map(this::mapPublicAssessmentAttempt)
-                        .toList();
+        List<PublicAssessmentAttempt> assessmentAttempts =
+                publicAssessmentAttemptRepository.findTop200ByOrderBySubmittedAtDesc();
 
-        List<Map<String, Object>> challengeAttempts =
-                publicChallengeAttemptRepository.findTop200ByOrderBySubmittedAtDesc()
-                        .stream()
-                        .map(this::mapPublicChallengeAttempt)
-                        .toList();
+        List<PublicChallengeAttempt> challengeAttempts =
+                publicChallengeAttemptRepository.findTop200ByOrderBySubmittedAtDesc();
 
-        data.put("assessmentAttempts", assessmentAttempts);
-        data.put("challengeAttempts", challengeAttempts);
-        data.put("totalAttempts", assessmentAttempts.size() + challengeAttempts.size());
+        Set<Long> leadIds = new HashSet<>();
+        Set<Long> assessmentIds = new HashSet<>();
+        Set<Long> challengeIds = new HashSet<>();
+
+        for (PublicAssessmentAttempt attempt : assessmentAttempts) {
+            if (attempt.getLeadId() != null) leadIds.add(attempt.getLeadId());
+            if (attempt.getAssessmentId() != null) assessmentIds.add(attempt.getAssessmentId());
+        }
+
+        for (PublicChallengeAttempt attempt : challengeAttempts) {
+            if (attempt.getLeadId() != null) leadIds.add(attempt.getLeadId());
+            if (attempt.getChallengeId() != null) challengeIds.add(attempt.getChallengeId());
+        }
+
+        Map<Long, Lead> leadsMap = new HashMap<>();
+        if (!leadIds.isEmpty()) {
+            leadRepository.findAllById(leadIds).forEach(l -> leadsMap.put(l.getId(), l));
+        }
+
+        Map<Long, Assessment> assessmentsMap = new HashMap<>();
+        if (!assessmentIds.isEmpty()) {
+            assessmentRepository.findAllById(assessmentIds).forEach(a -> assessmentsMap.put(a.getId(), a));
+        }
+
+        Map<Long, PseudoCodeChallenge> challengesMap = new HashMap<>();
+        if (!challengeIds.isEmpty()) {
+            challengeRepository.findAllById(challengeIds).forEach(c -> challengesMap.put(c.getId(), c));
+        }
+
+        List<Map<String, Object>> assessmentAttemptsMapped = assessmentAttempts.stream()
+                .map(attempt -> mapPublicAssessmentAttempt(attempt, leadsMap.get(attempt.getLeadId()), assessmentsMap.get(attempt.getAssessmentId())))
+                .toList();
+
+        List<Map<String, Object>> challengeAttemptsMapped = challengeAttempts.stream()
+                .map(attempt -> mapPublicChallengeAttempt(attempt, leadsMap.get(attempt.getLeadId()), challengesMap.get(attempt.getChallengeId())))
+                .toList();
+
+        data.put("assessmentAttempts", assessmentAttemptsMapped);
+        data.put("challengeAttempts", challengeAttemptsMapped);
+        data.put("totalAttempts", assessmentAttemptsMapped.size() + challengeAttemptsMapped.size());
 
         return ApiResponse.success(data);
     }
@@ -261,10 +315,23 @@ public class AdminPublicPracticeController {
     @Transactional(readOnly = true)
     @GetMapping("/assessments/{id}/attempts")
     public ApiResponse<?> assessmentAttempts(@PathVariable Long id) {
+        List<PublicAssessmentAttempt> attempts = publicAssessmentAttemptRepository.findByAssessmentIdOrderBySubmittedAtDesc(id);
+
+        Set<Long> leadIds = new HashSet<>();
+        for (PublicAssessmentAttempt attempt : attempts) {
+            if (attempt.getLeadId() != null) leadIds.add(attempt.getLeadId());
+        }
+
+        Map<Long, Lead> leadsMap = new HashMap<>();
+        if (!leadIds.isEmpty()) {
+            leadRepository.findAllById(leadIds).forEach(l -> leadsMap.put(l.getId(), l));
+        }
+
+        Assessment assessment = assessmentRepository.findById(id).orElse(null);
+
         return ApiResponse.success(
-                publicAssessmentAttemptRepository.findByAssessmentIdOrderBySubmittedAtDesc(id)
-                        .stream()
-                        .map(this::mapPublicAssessmentAttempt)
+                attempts.stream()
+                        .map(attempt -> mapPublicAssessmentAttempt(attempt, leadsMap.get(attempt.getLeadId()), assessment))
                         .toList()
         );
     }
@@ -272,10 +339,23 @@ public class AdminPublicPracticeController {
     @Transactional(readOnly = true)
     @GetMapping("/challenges/{id}/attempts")
     public ApiResponse<?> challengeAttempts(@PathVariable Long id) {
+        List<PublicChallengeAttempt> attempts = publicChallengeAttemptRepository.findByChallengeIdOrderBySubmittedAtDesc(id);
+
+        Set<Long> leadIds = new HashSet<>();
+        for (PublicChallengeAttempt attempt : attempts) {
+            if (attempt.getLeadId() != null) leadIds.add(attempt.getLeadId());
+        }
+
+        Map<Long, Lead> leadsMap = new HashMap<>();
+        if (!leadIds.isEmpty()) {
+            leadRepository.findAllById(leadIds).forEach(l -> leadsMap.put(l.getId(), l));
+        }
+
+        PseudoCodeChallenge challenge = challengeRepository.findById(id).orElse(null);
+
         return ApiResponse.success(
-                publicChallengeAttemptRepository.findByChallengeIdOrderBySubmittedAtDesc(id)
-                        .stream()
-                        .map(this::mapPublicChallengeAttempt)
+                attempts.stream()
+                        .map(attempt -> mapPublicChallengeAttempt(attempt, leadsMap.get(attempt.getLeadId()), challenge))
                         .toList()
         );
     }
@@ -498,6 +578,11 @@ public class AdminPublicPracticeController {
     }
 
     private Map<String, Object> mapAssessment(Assessment assessment) {
+        long count = publicAssessmentAttemptRepository.countByAssessmentId(assessment.getId());
+        return mapAssessment(assessment, count);
+    }
+
+    private Map<String, Object> mapAssessment(Assessment assessment, long publicAttemptCount) {
         Map<String, Object> map = new LinkedHashMap<>();
 
         map.put("id", assessment.getId());
@@ -534,12 +619,17 @@ public class AdminPublicPracticeController {
         map.put("publishedAt", assessment.getPublishedAt());
         map.put("publishedByUserId", assessment.getPublishedByUserId());
         map.put("questionCount", assessment.getQuestions() == null ? 0 : assessment.getQuestions().size());
-        map.put("publicAttemptCount", publicAssessmentAttemptRepository.countByAssessmentId(assessment.getId()));
+        map.put("publicAttemptCount", publicAttemptCount);
 
         return map;
     }
 
     private Map<String, Object> mapChallenge(PseudoCodeChallenge challenge) {
+        long count = publicChallengeAttemptRepository.countByChallengeId(challenge.getId());
+        return mapChallenge(challenge, count);
+    }
+
+    private Map<String, Object> mapChallenge(PseudoCodeChallenge challenge, long publicAttemptCount) {
         Map<String, Object> map = new LinkedHashMap<>();
 
         map.put("id", challenge.getId());
@@ -549,7 +639,7 @@ public class AdminPublicPracticeController {
         map.put("trainerEmail", challenge.getTrainerEmail());
         map.put("trainerName", challenge.getTrainerEmail());
         map.put("batchId", challenge.getBatchId());
-        map.put("batchName", challenge.getBatchId() == null ? "" : "Batch #" + challenge.getBatchId());
+        map.put("batchName", challenge.getChallengeGroupId() == null ? "" : "Batch #" + challenge.getBatchId());
         map.put(
                 "companyName",
                 challenge.getCompanyName() == null || challenge.getCompanyName().isBlank()
@@ -572,16 +662,19 @@ public class AdminPublicPracticeController {
         map.put("publishedAt", challenge.getPublishedAt());
         map.put("publishedByUserId", challenge.getPublishedByUserId());
         map.put("testCasesCount", challenge.getTestCases() == null ? 0 : challenge.getTestCases().size());
-        map.put("publicAttemptCount", publicChallengeAttemptRepository.countByChallengeId(challenge.getId()));
+        map.put("publicAttemptCount", publicAttemptCount);
 
         return map;
     }
 
     private Map<String, Object> mapPublicAssessmentAttempt(PublicAssessmentAttempt attempt) {
-        Map<String, Object> map = new LinkedHashMap<>();
-
         Lead lead = leadRepository.findById(attempt.getLeadId()).orElse(null);
         Assessment assessment = assessmentRepository.findById(attempt.getAssessmentId()).orElse(null);
+        return mapPublicAssessmentAttempt(attempt, lead, assessment);
+    }
+
+    private Map<String, Object> mapPublicAssessmentAttempt(PublicAssessmentAttempt attempt, Lead lead, Assessment assessment) {
+        Map<String, Object> map = new LinkedHashMap<>();
 
         map.put("id", attempt.getId());
         map.put("type", "ASSESSMENT");
@@ -607,10 +700,13 @@ public class AdminPublicPracticeController {
     }
 
     private Map<String, Object> mapPublicChallengeAttempt(PublicChallengeAttempt attempt) {
-        Map<String, Object> map = new LinkedHashMap<>();
-
         Lead lead = leadRepository.findById(attempt.getLeadId()).orElse(null);
         PseudoCodeChallenge challenge = challengeRepository.findById(attempt.getChallengeId()).orElse(null);
+        return mapPublicChallengeAttempt(attempt, lead, challenge);
+    }
+
+    private Map<String, Object> mapPublicChallengeAttempt(PublicChallengeAttempt attempt, Lead lead, PseudoCodeChallenge challenge) {
+        Map<String, Object> map = new LinkedHashMap<>();
 
         map.put("id", attempt.getId());
         map.put("type", "CHALLENGE");
