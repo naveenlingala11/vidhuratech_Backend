@@ -73,16 +73,36 @@ public class PublicPracticeService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> getPracticeLibrary() {
-        List<Map<String, Object>> assessments = assessmentRepository
-                .findActivePublicAssessmentsLight(LocalDateTime.now())
+        List<Assessment> activeAssessments = assessmentRepository.findActivePublicAssessmentsLight(LocalDateTime.now());
+        List<PseudoCodeChallenge> activeChallenges = challengeRepository.findActivePublicChallengesLight();
+
+        List<Long> assessmentIds = activeAssessments.stream().map(Assessment::getId).toList();
+        List<Long> challengeIds = activeChallenges.stream().map(PseudoCodeChallenge::getId).toList();
+
+        Map<Long, Integer> assessmentQuestionsCountMap = new HashMap<>();
+        if (!assessmentIds.isEmpty()) {
+            List<Object[]> counts = assessmentRepository.countQuestionsForAssessments(assessmentIds);
+            for (Object[] row : counts) {
+                assessmentQuestionsCountMap.put((Long) row[0], ((Number) row[1]).intValue());
+            }
+        }
+
+        Map<Long, Integer> challengeTestCasesCountMap = new HashMap<>();
+        if (!challengeIds.isEmpty()) {
+            List<Object[]> counts = challengeRepository.countTestCasesForChallenges(challengeIds);
+            for (Object[] row : counts) {
+                challengeTestCasesCountMap.put((Long) row[0], ((Number) row[1]).intValue());
+            }
+        }
+
+        List<Map<String, Object>> assessments = activeAssessments
                 .stream()
-                .map(this::mapAssessmentCard)
+                .map(a -> mapAssessmentCard(a, assessmentQuestionsCountMap.getOrDefault(a.getId(), 0)))
                 .toList();
 
-        List<Map<String, Object>> challenges = challengeRepository
-                .findActivePublicChallengesLight()
+        List<Map<String, Object>> challenges = activeChallenges
                 .stream()
-                .map(this::mapChallengeCard)
+                .map(c -> mapChallengeCard(c, challengeTestCasesCountMap.getOrDefault(c.getId(), 0)))
                 .toList();
 
         List<Map<String, Object>> interviewQuestions = interviewQuestionRepository
@@ -537,6 +557,14 @@ public class PublicPracticeService {
     }
 
     private Map<String, Object> mapAssessmentCard(Assessment assessment) {
+        int count = 0;
+        try {
+            count = assessment.getQuestions() == null ? 0 : assessment.getQuestions().size();
+        } catch (Exception ignored) {}
+        return mapAssessmentCard(assessment, count);
+    }
+
+    private Map<String, Object> mapAssessmentCard(Assessment assessment, int questionCount) {
         Map<String, Object> map = new LinkedHashMap<>();
 
         map.put("id", assessment.getId());
@@ -551,11 +579,7 @@ public class PublicPracticeService {
                 : assessment.getSkill());
         map.put("durationMinutes", assessment.getDurationMinutes() == null ? 0 : assessment.getDurationMinutes());
         map.put("totalMarks", assessment.getTotalMarks() == null ? 0 : assessment.getTotalMarks());
-        try {
-            map.put("questionCount", assessment.getQuestions() == null ? 0 : assessment.getQuestions().size());
-        } catch (Exception e) {
-            map.put("questionCount", 0);
-        }
+        map.put("questionCount", questionCount);
         map.put("accessLevel", assessment.getPublicAccessLevel());
         map.put("attemptLimit", assessment.getPublicAttemptLimit());
 
@@ -563,6 +587,14 @@ public class PublicPracticeService {
     }
 
     private Map<String, Object> mapChallengeCard(PseudoCodeChallenge challenge) {
+        int count = 0;
+        try {
+            count = challenge.getTestCases() == null ? 0 : challenge.getTestCases().size();
+        } catch (Exception ignored) {}
+        return mapChallengeCard(challenge, count);
+    }
+
+    private Map<String, Object> mapChallengeCard(PseudoCodeChallenge challenge, int testCasesCount) {
         Map<String, Object> map = new LinkedHashMap<>();
 
         map.put("id", challenge.getId());
@@ -577,11 +609,7 @@ public class PublicPracticeService {
                 : challenge.getSkill());
         map.put("durationMinutes", challenge.getDurationMinutes() == null ? 0 : challenge.getDurationMinutes());
         map.put("totalMarks", challenge.getTotalMarks() == null ? 0 : challenge.getTotalMarks());
-        try {
-            map.put("questionCount", challenge.getTestCases() == null ? 0 : challenge.getTestCases().size());
-        } catch (Exception e) {
-            map.put("questionCount", 0);
-        }
+        map.put("questionCount", testCasesCount);
         map.put("challengeGroupTitle", safe(challenge.getChallengeGroupTitle()));
         map.put("accessLevel", challenge.getPublicAccessLevel());
         map.put("attemptLimit", challenge.getPublicAttemptLimit());

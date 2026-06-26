@@ -30,3 +30,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Local/sensitive run scripts
+run_prod.bat

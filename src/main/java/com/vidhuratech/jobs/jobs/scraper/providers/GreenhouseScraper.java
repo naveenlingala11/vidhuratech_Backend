@@ -6,6 +6,8 @@ import com.vidhuratech.jobs.jobs.entity.Job;
 import com.vidhuratech.jobs.jobs.scraper.engine.ApiConfig;
 import com.vidhuratech.jobs.jobs.scraper.engine.ApiScraper;
 import org.jsoup.Jsoup;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -13,6 +15,7 @@ import java.util.*;
 @Component
 public class GreenhouseScraper implements ApiScraper {
 
+    private static final Logger log = LoggerFactory.getLogger(GreenhouseScraper.class);
     private final ObjectMapper mapper = new ObjectMapper();
 
     // ✅ FIXED SLUGS (only override where needed)
@@ -62,7 +65,7 @@ public class GreenhouseScraper implements ApiScraper {
             }
 
         } catch (Exception e) {
-            System.out.println("❌ Greenhouse failed: " + config.getCompany());
+            log.debug("Greenhouse failed: {}", config.getCompany());
             return null;
         }
 

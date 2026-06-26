@@ -2,12 +2,16 @@ package com.vidhuratech.jobs.jobs.scraper.engine;
 
 import com.vidhuratech.jobs.jobs.entity.Job;
 import com.vidhuratech.jobs.jobs.scraper.providers.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
 public class ApiScraperEngine {
+
+    private static final Logger log = LoggerFactory.getLogger(ApiScraperEngine.class);
 
     private final GreenhouseScraper greenhouse;
     private final LeverScraper lever;
@@ -58,14 +62,14 @@ public class ApiScraperEngine {
             return jobs;
 
         } catch (Exception e) {
-            System.out.println("❌ Engine error: " + cfg.getCompany());
+            log.debug("❌ Engine error: " + cfg.getCompany());
             return null;
         }
     }
 
     private List<Job> fallback(ApiConfig cfg) {
         try {
-            System.out.println("🔁 Fallback → LinkedIn: " + cfg.getCompany());
+            log.debug("🔁 Fallback → LinkedIn: " + cfg.getCompany());
 
             ApiConfig li = new ApiConfig();
             li.setCompany(cfg.getCompany());

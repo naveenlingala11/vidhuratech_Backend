@@ -6,6 +6,8 @@ import com.vidhuratech.jobs.jobs.entity.Job;
 import com.vidhuratech.jobs.jobs.scraper.engine.ApiConfig;
 import com.vidhuratech.jobs.jobs.scraper.engine.ApiScraper;
 import org.jsoup.Jsoup;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -17,6 +19,8 @@ import java.util.List;
  */
 @Component
 public class SmartRecruitersScraper implements ApiScraper {
+
+    private static final Logger log = LoggerFactory.getLogger(SmartRecruitersScraper.class);
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -60,7 +64,7 @@ public class SmartRecruitersScraper implements ApiScraper {
                 if (offset >= total) break;
 
             } catch (Exception e) {
-                System.out.println("❌ SmartRecruiters [" + config.getCompany() + "]: " + e.getMessage());
+                log.debug("❌ SmartRecruiters [" + config.getCompany() + "]: " + e.getMessage());
                 failed = true;
                 break;
             }
@@ -70,7 +74,7 @@ public class SmartRecruitersScraper implements ApiScraper {
             return null;
         }
 
-        System.out.println("✅ SmartRecruiters [" + config.getCompany() + "] → " + jobs.size());
+        log.debug("✅ SmartRecruiters [" + config.getCompany() + "] → " + jobs.size());
         return jobs;
     }
 

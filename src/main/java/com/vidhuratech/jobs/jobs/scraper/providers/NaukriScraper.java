@@ -6,12 +6,16 @@ import com.vidhuratech.jobs.jobs.scraper.engine.ApiScraper;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.select.Elements;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
 
 @Component
 public class NaukriScraper implements ApiScraper {
+
+    private static final Logger log = LoggerFactory.getLogger(NaukriScraper.class);
 
     @Override
     public List<Job> scrape(ApiConfig config) {
@@ -47,7 +51,7 @@ public class NaukriScraper implements ApiScraper {
             }
 
         } catch (Exception e) {
-            System.out.println("❌ Naukri blocked");
+            log.debug("❌ Naukri blocked");
         }
 
         return jobs;

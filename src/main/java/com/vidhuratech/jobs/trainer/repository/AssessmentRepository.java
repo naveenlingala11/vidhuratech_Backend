@@ -94,6 +94,9 @@ public interface AssessmentRepository extends JpaRepository<Assessment, Long> {
 """)
     List<Assessment> findActivePublicAssessmentsLight(LocalDateTime now);
 
+    @Query("SELECT q.assessment.id, COUNT(q) FROM AssessmentQuestion q WHERE q.assessment.id IN :assessmentIds GROUP BY q.assessment.id")
+    List<Object[]> countQuestionsForAssessments(@org.springframework.data.repository.query.Param("assessmentIds") List<Long> assessmentIds);
+
     @Query("""
     SELECT DISTINCT a
     FROM Assessment a
