@@ -4,6 +4,7 @@ import com.vidhuratech.jobs.common.api.ApiResponse;
 import com.vidhuratech.jobs.trainer.entity.MockInterviewRequest;
 import com.vidhuratech.jobs.trainer.repository.MockInterviewRequestRepository;
 import com.vidhuratech.jobs.trainer.service.TrainerWorkflowService;
+import com.vidhuratech.jobs.common.security.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.web.bind.annotation.*;
@@ -23,6 +24,10 @@ public class PublicMockInterviewController {
     @Autowired
     @Lazy
     private TrainerWorkflowService trainerWorkflowService;
+
+    @Autowired
+    @Lazy
+    private SecurityUtils securityUtils;
 
     @GetMapping("/check/{id}")
     public ApiResponse<?> checkRoomStatus(@PathVariable Long id) {
