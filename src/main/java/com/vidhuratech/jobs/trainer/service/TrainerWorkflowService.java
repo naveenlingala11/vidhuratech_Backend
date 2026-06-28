@@ -411,6 +411,12 @@ public class TrainerWorkflowService {
         map.put("participantCount", request.getParticipantCount() == null ? 0 : request.getParticipantCount());
         map.put("meetingLogs", request.getMeetingLogs() == null ? "" : request.getMeetingLogs());
         map.put("isPublic", Boolean.TRUE.equals(request.getIsPublic()));
+        map.put("hostEmail", request.getHostEmail() == null ? "" : request.getHostEmail());
+        map.put("hostName", request.getHostName() == null ? "" : request.getHostName());
+        map.put("trainerEmail", request.getTrainer() != null ? request.getTrainer().getEmail() : "");
+        map.put("trainerName", request.getTrainer() != null ? request.getTrainer().getName() : "");
+        map.put("candidateEmail", request.getCandidateEmail() == null ? "" : request.getCandidateEmail());
+        map.put("candidateName", request.getCandidateName() == null ? "" : request.getCandidateName());
 
         map.put("joinCount", request.getJoinCount() == null ? 0 : request.getJoinCount());
         map.put("recurringType", request.getRecurringType() == null ? "ONCE" : request.getRecurringType());
@@ -546,18 +552,59 @@ public class TrainerWorkflowService {
 
     @Transactional
     public Map<String, Object> createPublicMockInterview(Map<String, Object> payload) {
-        String topic = payload.getOrDefault("topic", "Live Connect Mock Interview").toString();
+        String topic = payload.getOrDefault("topic", "").toString().trim();
         String hostEmail = payload.getOrDefault("hostEmail", "").toString().trim();
         String hostName = payload.getOrDefault("hostName", "").toString().trim();
         String candidateEmail = payload.getOrDefault("candidateEmail", "").toString().trim();
         String candidateName = payload.getOrDefault("candidateName", "").toString().trim();
 
+        if (topic.isEmpty()) {
+            throw new IllegalArgumentException("Session topic/title cannot be empty.");
+        }
+        if (hostEmail.isEmpty()) {
+            throw new IllegalArgumentException("Host email is required.");
+        }
+        if (payload.get("preferredDate") == null || payload.get("preferredDate").toString().isBlank()) {
+            throw new IllegalArgumentException("Preferred date is required.");
+        }
+        LocalDate dateVal;
+        try {
+            dateVal = LocalDate.parse(payload.get("preferredDate").toString());
+            if (dateVal.isBefore(LocalDate.now())) {
+                throw new IllegalArgumentException("Preferred date cannot be in the past.");
+            }
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid preferred date format.");
+        }
+        if (payload.get("preferredTime") == null || payload.get("preferredTime").toString().isBlank()) {
+            throw new IllegalArgumentException("Preferred time is required.");
+        }
+        LocalTime timeVal;
+        try {
+            timeVal = LocalTime.parse(payload.get("preferredTime").toString());
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid preferred time format.");
+        }
+
         Integer duration = 60;
         if (payload.containsKey("maxDurationMinutes") && payload.get("maxDurationMinutes") != null) {
             try {
                 duration = Integer.valueOf(payload.get("maxDurationMinutes").toString());
+                if (duration < 0) {
+                    throw new IllegalArgumentException("Duration must be zero (unlimited) or a positive number of minutes.");
+                }
+            } catch (IllegalArgumentException e) {
+                throw e;
             } catch (Exception e) {
-                // ignore
+                throw new IllegalArgumentException("Duration must be a valid number.");
+            }
+        }
+
+        if (!candidateEmail.isEmpty()) {
+            if (!candidateEmail.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+                throw new IllegalArgumentException("Invalid candidate email address.");
             }
         }
 
@@ -578,24 +625,11 @@ public class TrainerWorkflowService {
         request.setIsEnded(false);
         request.setIsPublic(true);
         request.setCreatedAt(LocalDateTime.now());
+        request.setPreferredDate(dateVal);
+        request.setPreferredTime(timeVal);
 
         String hostRole = payload.getOrDefault("hostRole", "GUEST").toString().trim().toUpperCase();
         request.setHostRole(hostRole);
-
-        if (payload.containsKey("preferredDate") && payload.get("preferredDate") != null
-                && !payload.get("preferredDate").toString().isBlank()) {
-            try {
-                request.setPreferredDate(LocalDate.parse(payload.get("preferredDate").toString()));
-            } catch (Exception e) {
-            }
-        }
-        if (payload.containsKey("preferredTime") && payload.get("preferredTime") != null
-                && !payload.get("preferredTime").toString().isBlank()) {
-            try {
-                request.setPreferredTime(LocalTime.parse(payload.get("preferredTime").toString()));
-            } catch (Exception e) {
-            }
-        }
         if (payload.containsKey("preferredEndTime") && payload.get("preferredEndTime") != null
                 && !payload.get("preferredEndTime").toString().isBlank()) {
             try {
@@ -627,6 +661,10 @@ public class TrainerWorkflowService {
         request.setHostEmail(hostEmail);
         request.setCandidateName(candidateName);
         request.setCandidateEmail(candidateEmail);
+
+        if (payload.containsKey("notes") && payload.get("notes") != null) {
+            request.setNotes(payload.get("notes").toString());
+        }
 
         MockInterviewRequest saved = mockRepository.save(request);
 
@@ -899,5 +937,123 @@ public class TrainerWorkflowService {
             org.slf4j.LoggerFactory.getLogger(TrainerWorkflowService.class)
                     .error("Failed to compile/send meeting invite email to {}", toEmail, e);
         }
+    }
+
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public List<Map<String, Object>> getMySessions(String email) {
+        return mockRepository.findAllUserSessions(email).stream()
+                .map(this::mapMock)
+                .toList();
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public Map<String, Object> updatePublicMockInterview(Long id, Map<String, Object> payload, String currentUserEmail) {
+        MockInterviewRequest request = mockRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Mock interview request not found"));
+
+        String hostEmail = request.getHostEmail();
+        String trainerEmail = request.getTrainer() != null ? request.getTrainer().getEmail() : null;
+
+        boolean isHost = currentUserEmail.equalsIgnoreCase(hostEmail)
+                || (trainerEmail != null && currentUserEmail.equalsIgnoreCase(trainerEmail));
+
+        if (!isHost) {
+            throw new RuntimeException("Access denied. Only the session host can edit this session.");
+        }
+
+        if (payload.containsKey("topic")) {
+            String topic = String.valueOf(payload.get("topic")).trim();
+            if (topic.isEmpty()) {
+                throw new IllegalArgumentException("Session topic/title cannot be empty.");
+            }
+            request.setTopic(topic);
+        }
+        if (payload.containsKey("notes")) {
+            request.setNotes(payload.get("notes") != null ? String.valueOf(payload.get("notes")) : null);
+        }
+        if (payload.containsKey("preferredDate")) {
+            if (payload.get("preferredDate") == null || payload.get("preferredDate").toString().isBlank()) {
+                throw new IllegalArgumentException("Preferred date is required.");
+            }
+            try {
+                java.time.LocalDate dateVal = java.time.LocalDate.parse(payload.get("preferredDate").toString());
+                if (dateVal.isBefore(java.time.LocalDate.now())) {
+                    throw new IllegalArgumentException("Preferred date cannot be in the past.");
+                }
+                request.setPreferredDate(dateVal);
+            } catch (IllegalArgumentException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Invalid preferred date format.");
+            }
+        }
+        if (payload.containsKey("preferredTime")) {
+            if (payload.get("preferredTime") == null || payload.get("preferredTime").toString().isBlank()) {
+                throw new IllegalArgumentException("Preferred time is required.");
+            }
+            try {
+                request.setPreferredTime(java.time.LocalTime.parse(payload.get("preferredTime").toString()));
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Invalid preferred time format.");
+            }
+        }
+        if (payload.containsKey("maxDurationMinutes")) {
+            if (payload.get("maxDurationMinutes") == null) {
+                throw new IllegalArgumentException("Duration is required.");
+            }
+            try {
+                Integer duration = Integer.valueOf(payload.get("maxDurationMinutes").toString());
+                if (duration < 0) {
+                    throw new IllegalArgumentException("Duration must be zero (unlimited) or a positive number of minutes.");
+                }
+                request.setMaxDurationMinutes(duration);
+            } catch (IllegalArgumentException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Duration must be a valid number.");
+            }
+        }
+        if (payload.containsKey("recurringType")) {
+            request.setRecurringType(payload.get("recurringType") != null ? String.valueOf(payload.get("recurringType")).toUpperCase().trim() : "ONCE");
+        }
+        if (payload.containsKey("recurringDays")) {
+            request.setRecurringDays(payload.get("recurringDays") != null ? payload.get("recurringDays").toString() : null);
+        }
+        if (payload.containsKey("invitedEmails")) {
+            request.setInvitedEmails(payload.get("invitedEmails") != null ? payload.get("invitedEmails").toString() : null);
+        }
+        if (payload.containsKey("candidateName")) {
+            request.setCandidateName(payload.get("candidateName") != null ? String.valueOf(payload.get("candidateName")) : null);
+        }
+        if (payload.containsKey("candidateEmail")) {
+            String candEmail = payload.get("candidateEmail") != null ? String.valueOf(payload.get("candidateEmail")).trim() : "";
+            if (!candEmail.isEmpty() && !candEmail.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+                throw new IllegalArgumentException("Invalid candidate email address.");
+            }
+            request.setCandidateEmail(candEmail);
+            if (!candEmail.isEmpty()) {
+                userRepository.findByEmail(candEmail).ifPresent(request::setStudent);
+            } else {
+                request.setStudent(null);
+            }
+        }
+
+        request.setUpdatedAt(java.time.LocalDateTime.now());
+        MockInterviewRequest saved = mockRepository.save(request);
+
+        if (payload.containsKey("invitedEmails") && payload.get("invitedEmails") != null) {
+            String invitedEmailsStr = saved.getInvitedEmails();
+            if (invitedEmailsStr != null && !invitedEmailsStr.isBlank()) {
+                String[] emails = invitedEmailsStr.split(",");
+                for (String email : emails) {
+                    String trimmedEmail = email.trim();
+                    if (!trimmedEmail.isEmpty()) {
+                        sendInvitationEmail(saved, trimmedEmail);
+                    }
+                }
+            }
+        }
+
+        return mapMock(saved);
     }
 }
