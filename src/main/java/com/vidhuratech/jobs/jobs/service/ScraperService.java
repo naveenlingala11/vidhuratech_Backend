@@ -60,32 +60,22 @@ public class ScraperService {
                 return;
             }
 
-            // 🔥 OPTION 2: PARALLEL (FASTER)
-            ExecutorService pool = Executors.newFixedThreadPool(3);
+             // 🔥 SEQUENTIAL PROCESSING (OPTIMIZED FOR MEMORY BUDGETS)
+             for (ScraperConfigEntity entity : configs) {
+                 try {
+                     processCompany(entity);
+                     sleepRandom();
+                 } catch (Exception ex) {
+                     log.error("Error processing company " + entity.getCompany(), ex);
+                 }
+             }
 
-            for (ScraperConfigEntity entity : configs) {
-                pool.submit(() -> {
-                    processCompany(entity);
-                    sleepRandom();
-                });
-            }
+             long globalEnd = System.currentTimeMillis();
 
-            pool.shutdown();
-            try {
-                if (!pool.awaitTermination(30, java.util.concurrent.TimeUnit.MINUTES)) {
-                    pool.shutdownNow();
-                }
-            } catch (InterruptedException ex) {
-                pool.shutdownNow();
-                Thread.currentThread().interrupt();
-            }
+             log.info("SCRAPING COMPLETED in {} sec", (globalEnd - globalStart) / 1000);
 
-            long globalEnd = System.currentTimeMillis();
-
-            log.info("SCRAPING COMPLETED in {} sec", (globalEnd - globalStart) / 1000);
-
-            // Run sweep validation of all job links to prune dead ones
-            jobService.validateAllJobLinks();
+             // Run sweep validation of all job links to prune dead ones
+             jobService.validateAllJobLinks();
 
         } finally {
             status.setRunning(false);

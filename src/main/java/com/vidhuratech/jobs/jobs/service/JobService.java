@@ -18,14 +18,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
-
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.time.LocalDateTime;
 import java.util.*;
-import org.jsoup.Jsoup;
 import java.util.concurrent.Executors;
+import org.jsoup.Jsoup;
 
 @Service
 public class JobService {
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     private static final Logger log = LoggerFactory.getLogger(JobService.class);
 
@@ -112,6 +116,11 @@ public class JobService {
                 saved.setSkills(skills);
                 jobRepo.save(saved);
             });
+
+            // 🔥 Detach entities to release JVM memory Heap buildup (Option B optimization)
+            if (entityManager != null) {
+                entityManager.clear();
+            }
 
         } catch (Exception e) {
             e.printStackTrace(); // 🔥 VERY IMPORTANT
