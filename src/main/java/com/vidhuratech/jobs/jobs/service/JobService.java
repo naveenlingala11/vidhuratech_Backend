@@ -352,37 +352,71 @@ public class JobService {
     }
 
     public void validateAllJobLinks() {
-        log.debug("🔍 STARTING DYNAMIC VALIDATION OF ALL JOB LINKS...");
+        log.info("🔍 STARTING MEMORY-OPTIMIZED BATCH VALIDATION OF JOB LINKS...");
         try {
-            List<Job> allJobs = jobRepo.findAll();
-            int total = allJobs.size();
-            log.debug("📋 Total jobs to validate: {}", total);
-            
-            try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-                for (Job job : allJobs) {
-                    executor.submit(() -> {
-                        String url = job.getApplyLink();
-                        if (url != null && !url.contains("localhost") && !url.isBlank()) {
-                            if (!isUrlActive(url)) {
-                                deleteJobInTransaction(job.getId(), job.getTitle());
+            int pageSize = 100;
+            int pageNumber = 0;
+            long totalValidated = 0;
+            long totalPruned = 0;
+
+            // Bounded pool to restrict maximum concurrent HTTP request overhead to 5
+            try (var executor = Executors.newFixedThreadPool(5)) {
+                while (true) {
+                    Page<Job> page = jobRepo.findAll(PageRequest.of(pageNumber, pageSize, Sort.by("id").ascending()));
+                    List<Job> jobs = page.getContent();
+                    if (jobs.isEmpty()) {
+                        break;
+                    }
+
+                    List<Long> deadJobIds = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+                    List<java.util.concurrent.Future<?>> futures = new java.util.ArrayList<>();
+
+                    for (Job job : jobs) {
+                        futures.add(executor.submit(() -> {
+                            String url = job.getApplyLink();
+                            if (url != null && !url.contains("localhost") && !url.isBlank()) {
+                                if (!isUrlActive(url)) {
+                                    deadJobIds.add(job.getId());
+                                    log.debug("🗑️ MARKED EXPIRED/404 JOB FOR DELETION: {} (ID: {})", job.getTitle(), job.getId());
+                                }
                             }
-                        }
-                    });
+                        }));
+                    }
+
+                    // Wait for all tasks in this batch to finish
+                    for (java.util.concurrent.Future<?> f : futures) {
+                        try {
+                            f.get();
+                        } catch (Exception ignored) {}
+                    }
+
+                    // Bulk delete dead jobs in a single database transaction
+                    if (!deadJobIds.isEmpty()) {
+                        transactionTemplate.executeWithoutResult(status -> {
+                            jobRepo.deleteAllByIdInBatch(deadJobIds);
+                        });
+                        totalPruned += deadJobIds.size();
+                    }
+
+                    totalValidated += jobs.size();
+                    log.info("🔄 Batch Validation Progress: Checked {} jobs, Pruned {} dead jobs.", totalValidated, totalPruned);
+
+                    // Clear first-level cache (Hibernate session) to prevent Heap build-up
+                    if (entityManager != null) {
+                        entityManager.clear();
+                    }
+
+                    // If we deleted some jobs in this page, the database indices shift.
+                    // To be safe, if we deleted records, we don't increment the page number
+                    // so we scan the next set of records properly.
+                    if (deadJobIds.isEmpty()) {
+                        pageNumber++;
+                    }
                 }
             }
-            log.debug("✅ JOB LINKS VALIDATION COMPLETED.");
+            log.info("✅ JOB LINKS VALIDATION COMPLETED. Checked: {}, Pruned: {}.", totalValidated, totalPruned);
         } catch (Exception e) {
             log.error("❌ ERROR VALIDATING JOB LINKS", e);
-        }
-    }
-
-    @Transactional
-    public void deleteJobInTransaction(Long id, String title) {
-        try {
-            jobRepo.deleteById(id);
-            log.debug("🗑️ PRUNED EXPIRED/404 JOB: {} (ID: {})", title, id);
-        } catch (Exception e) {
-            // ignore
         }
     }
 
