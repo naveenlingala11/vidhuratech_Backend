@@ -21,21 +21,60 @@ public class ScraperConfigLoader {
     public void load() {
         System.out.println("🚀 Refreshing/Loading scraper configurations into DB...");
         try {
-            repo.deleteAll();
-            List<ApiConfig> configs = verifiedConfigs();
-            for (ApiConfig c : configs) {
-                ScraperConfigEntity e = new ScraperConfigEntity();
-                e.setCompany(c.getCompany());
-                e.setType(c.getType());
-                e.setUrl(c.getUrl());
-                e.setActive(true);
-                e.setFailCount(0);
-                e.setSuccessCount(0);
-                repo.save(e);
+            List<ScraperConfigEntity> existingEntities = repo.findAll();
+            List<ApiConfig> verifiedConfigs = verifiedConfigs();
+
+            // Map existing configurations by "company:type" key
+            Map<String, ScraperConfigEntity> existingMap = new HashMap<>();
+            for (ScraperConfigEntity entity : existingEntities) {
+                String key = (entity.getCompany() + ":" + entity.getType()).toLowerCase();
+                existingMap.put(key, entity);
             }
-            System.out.println("✅ Loaded " + configs.size() + " verified scraper configurations.");
+
+            Set<String> verifiedKeys = new HashSet<>();
+            int updated = 0;
+            int created = 0;
+
+            for (ApiConfig c : verifiedConfigs) {
+                String key = (c.getCompany() + ":" + c.getType()).toLowerCase();
+                verifiedKeys.add(key);
+
+                ScraperConfigEntity entity = existingMap.get(key);
+                if (entity != null) {
+                    // Update URL if changed
+                    if (!c.getUrl().equals(entity.getUrl())) {
+                        entity.setUrl(c.getUrl());
+                        repo.save(entity);
+                        updated++;
+                    }
+                } else {
+                    // Create new configuration
+                    ScraperConfigEntity newEntity = new ScraperConfigEntity();
+                    newEntity.setCompany(c.getCompany());
+                    newEntity.setType(c.getType());
+                    newEntity.setUrl(c.getUrl());
+                    newEntity.setActive(true);
+                    newEntity.setFailCount(0);
+                    newEntity.setSuccessCount(0);
+                    repo.save(newEntity);
+                    created++;
+                }
+            }
+
+            // Remove configurations that are no longer verified (in code)
+            int deleted = 0;
+            for (ScraperConfigEntity entity : existingEntities) {
+                String key = (entity.getCompany() + ":" + entity.getType()).toLowerCase();
+                if (!verifiedKeys.contains(key)) {
+                    repo.delete(entity);
+                    deleted++;
+                }
+            }
+
+            System.out.println("✅ Loaded verified scraper configurations: " + created + " created, " + updated + " updated, " + deleted + " deleted.");
         } catch (Exception ex) {
             System.out.println("❌ Failed to load configurations: " + ex.getMessage());
+            ex.printStackTrace();
         }
     }
 
