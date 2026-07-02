@@ -174,6 +174,14 @@ public class PublicPracticeController {
                 .build();
     }
 
+    @GetMapping("/leaderboard/overall")
+    public ApiResponse<?> getOverallLeaderboard() {
+        return ApiResponse.builder()
+                .success(true)
+                .data(service.getOverallLeaderboard())
+                .build();
+    }
+
     @PostMapping("/access/session")
     public ApiResponse<?> registerAuthenticatedAccess(
             @RequestBody Map<String, Object> payload
