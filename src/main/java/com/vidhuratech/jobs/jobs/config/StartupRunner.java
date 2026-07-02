@@ -19,7 +19,11 @@ public class StartupRunner {
 
     @Async
     @EventListener(ApplicationReadyEvent.class)
-    public void runAfterStartup() {
+    public void runAfterStartup(ApplicationReadyEvent event) {
+        // Prevent execution in child/bootstrap contexts
+        if (event.getApplicationContext().getParent() != null) {
+            return;
+        }
         try {
             // ⏳ Small delay to let all beans fully initialize
             Thread.sleep(5000);
