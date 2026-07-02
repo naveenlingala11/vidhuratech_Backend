@@ -61,17 +61,7 @@ public class ScraperConfigLoader {
                 }
             }
 
-            // Remove configurations that are no longer verified (in code)
-            int deleted = 0;
-            for (ScraperConfigEntity entity : existingEntities) {
-                String key = (entity.getCompany() + ":" + entity.getType()).toLowerCase();
-                if (!verifiedKeys.contains(key)) {
-                    repo.delete(entity);
-                    deleted++;
-                }
-            }
-
-            System.out.println("✅ Loaded verified scraper configurations: " + created + " created, " + updated + " updated, " + deleted + " deleted.");
+            System.out.println("✅ Loaded verified scraper configurations: " + created + " created, " + updated + " updated.");
         } catch (Exception ex) {
             System.out.println("❌ Failed to load configurations: " + ex.getMessage());
             ex.printStackTrace();
