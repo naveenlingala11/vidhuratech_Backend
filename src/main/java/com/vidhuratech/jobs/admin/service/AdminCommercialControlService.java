@@ -53,7 +53,10 @@ public class AdminCommercialControlService {
 
             if (merged.containsKey(key)) {
                 Map<String, Object> existing = merged.get(key);
-                existing.put("source", existing.get("source") + "+LEAD");
+                String currentSource = String.valueOf(existing.get("source"));
+                if (!currentSource.contains("LEAD")) {
+                    existing.put("source", currentSource + "+LEAD");
+                }
 
                 if (isBlank(String.valueOf(existing.get("name")))) {
                     existing.put("name", safe(lead.getName()));

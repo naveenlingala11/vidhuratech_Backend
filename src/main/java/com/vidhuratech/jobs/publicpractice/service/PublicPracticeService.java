@@ -739,7 +739,7 @@ public class PublicPracticeService {
             accessLevel = challenge.getPublicAccessLevel();
         }
 
-        if (!"LEAD_REQUIRED".equalsIgnoreCase(accessLevel)) {
+        if (!"LEAD_REQUIRED".equalsIgnoreCase(accessLevel) && !"FREE".equalsIgnoreCase(accessLevel)) {
             throw new PracticeAccessRequiredException(
                     "This practice item is not open for guest registration. Please contact admin."
             );
@@ -973,6 +973,14 @@ public class PublicPracticeService {
         return buildPeriodLeaderboard("MONTHLY", start, end);
     }
 
+    @Transactional(readOnly = true)
+    public Map<String, Object> getOverallLeaderboard() {
+        LocalDateTime start = LocalDateTime.of(2000, 1, 1, 0, 0);
+        LocalDateTime end = LocalDateTime.of(2100, 12, 31, 23, 59);
+
+        return buildPeriodLeaderboard("OVERALL", start, end);
+    }
+
     private Map<String, Object> buildPeriodLeaderboard(
             String period,
             LocalDateTime start,
@@ -1111,6 +1119,17 @@ public class PublicPracticeService {
                     ? 0
                     : Math.round((float) percentageSum / attemptedChallenges);
 
+            Set<String> languages = new TreeSet<>();
+            for (PublicChallengeAttempt attempt : participantAttempts.values()) {
+                if (attempt.getLanguage() != null && !attempt.getLanguage().isBlank()) {
+                    languages.add(attempt.getLanguage().trim());
+                }
+            }
+            String languagesStr = String.join(", ", languages);
+            if (languagesStr.isEmpty()) {
+                languagesStr = "Multiple";
+            }
+
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("name", maskName(identityAttempt == null ? "" : identityAttempt.getParticipantName()));
             row.put("email", maskEmail(identityAttempt == null ? "" : identityAttempt.getParticipantEmail()));
@@ -1132,6 +1151,7 @@ public class PublicPracticeService {
             row.put("solvedChallengeTitles", solvedChallengeTitles);
             row.put("attemptedChallengeTitles", attemptedChallengeTitles);
             row.put("challengeBreakdown", challengeBreakdown);
+            row.put("language", languagesStr);
 
             rows.add(row);
         }
@@ -1685,7 +1705,7 @@ public class PublicPracticeService {
                 .trim()
                 .toUpperCase();
 
-        if (level.equals("PUBLIC_PREVIEW") || level.equals("LEAD_REQUIRED") || level.equals("PUBLIC")) {
+        if (level.equals("PUBLIC_PREVIEW") || level.equals("LEAD_REQUIRED") || level.equals("PUBLIC") || level.equals("FREE")) {
             return;
         }
 

@@ -53,27 +53,26 @@ public class AdminBatchServiceImpl implements AdminBatchService {
         Page<Batch> batchPage = batchRepository.findAll(spec, pageable);
 
         var content = batchPage.getContent().stream()
-                .map(batch -> Map.of(
-                        "id", batch.getId(),
-                        "name", batch.getName(),
-
-                        "courseId", batch.getCourse() != null ? batch.getCourse().getId() : null,
-                        "courseName", batch.getCourse() != null ? batch.getCourse().getTitle() : "-",
-
-                        "trainerId", batch.getTrainer() != null ? batch.getTrainer().getId() : null,
-                        "trainerName", batch.getTrainer() != null ? batch.getTrainer().getName() : "-",
-
-                        "status", batch.getStatus(),
-                        "studentCount", enrollmentRepository.countByBatchId(batch.getId())
-                ))
+                .map(batch -> {
+                    Map<String, Object> map = new java.util.HashMap<>();
+                    map.put("id", batch.getId());
+                    map.put("name", batch.getName());
+                    map.put("courseId", batch.getCourse() != null ? batch.getCourse().getId() : null);
+                    map.put("courseName", batch.getCourse() != null ? batch.getCourse().getTitle() : "-");
+                    map.put("trainerId", batch.getTrainer() != null ? batch.getTrainer().getId() : null);
+                    map.put("trainerName", batch.getTrainer() != null ? batch.getTrainer().getName() : "-");
+                    map.put("status", batch.getStatus());
+                    map.put("studentCount", enrollmentRepository.countByBatchId(batch.getId()));
+                    return map;
+                })
                 .toList();
 
-        return Map.of(
-                "content", content,
-                "totalElements", batchPage.getTotalElements(),
-                "totalPages", batchPage.getTotalPages(),
-                "page", batchPage.getNumber()
-        );
+        Map<String, Object> response = new java.util.HashMap<>();
+        response.put("content", content);
+        response.put("totalElements", batchPage.getTotalElements());
+        response.put("totalPages", batchPage.getTotalPages());
+        response.put("page", batchPage.getNumber());
+        return response;
     }
 
     @Override
